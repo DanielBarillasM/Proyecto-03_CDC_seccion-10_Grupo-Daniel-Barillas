@@ -65,6 +65,8 @@ class Generator {
   private needsConcat = false;
   private needsStringEquality = false;
   private needsArrayChecks = false;
+  private needsObjectChecks = false;
+  private needsDivisionChecks = false;
 
   constructor(private readonly tac: TacGenerationResult) {
     tac.activationRecords.forEach((frame) => this.frames.set(frame.id, frame));
@@ -84,6 +86,14 @@ class Generator {
       if (instruction.op === "TRY_BEGIN") tryDepth += 1;
     }
     for (const name of this.functions.keys()) this.data.push(`${safeLabel(name, "closure")}: .word ${safeLabel(name, "fn")}`);
+    for (const layout of tac.classLayouts) {
+      const methods = [...(layout.methods ?? [])].sort((left, right) => left.slot - right.slot);
+      this.data.push(
+        ".align 2",
+        `${this.vtableLabel(layout)}:`,
+        ...methods.map((method) => `  .word ${safeLabel(method.label, "closure")}`)
+      );
+    }
     for (const frame of tac.activationRecords.filter((candidate) => candidate.kind === "global")) {
       for (const slot of frame.slots) {
         const label = safeLabel(`${frame.id}_${slot.symbolId ?? slot.temporary ?? slot.name}`, "mem");
@@ -185,12 +195,19 @@ class Generator {
     const floatOperation = primitive(i.arg1.type, "float") || primitive(i.arg2.type, "float") || primitive(i.result.type, "float");
     if (floatOperation && i.op !== "MOD") {
       this.loadFloat(i.arg1, "$f2", i); this.loadFloat(i.arg2, "$f4", i);
+      if (i.op === "DIV") {
+        this.needsDivisionChecks = true;
+        this.emit("  mtc1 $zero, $f8", "  c.eq.s $f4, $f8", "  bc1t __rt_throw_div_zero", "  nop");
+      }
       const opcode = ({ ADD: "add.s", SUB: "sub.s", MUL: "mul.s", DIV: "div.s" } as Record<string, string>)[i.op];
       this.emit(`  ${opcode} $f6, $f2, $f4`); this.storeFloat("$f6", i.result, i); return;
     }
     const a = this.registers.getReg(), b = this.registers.getReg(), r = this.registers.getReg();
     this.loadWord(i.arg1, a, i); this.loadWord(i.arg2, b, i);
-    if (i.op === "DIV" || i.op === "MOD") this.emit(`  div ${a}, ${b}`, `  ${i.op === "DIV" ? "mflo" : "mfhi"} ${r}`);
+    if (i.op === "DIV" || i.op === "MOD") {
+      this.needsDivisionChecks = true;
+      this.emit(`  beq ${b}, $zero, __rt_throw_div_zero`, "  nop", `  div ${a}, ${b}`, `  ${i.op === "DIV" ? "mflo" : "mfhi"} ${r}`);
+    }
     else this.emit(`  ${i.op === "ADD" ? "addu" : i.op === "SUB" ? "subu" : "mul"} ${r}, ${a}, ${b}`);
     this.storeWord(r, i.result, i);
   }
@@ -249,6 +266,9 @@ class Generator {
     for (const slot of frame.slots.filter((candidate) => candidate.sharedCell)) {
       this.emit(slot.kind === "parameter" ? `  lw $t8, ${slot.offset}($fp)` : "  move $t8, $zero",
         "  li $a0, 4", "  li $v0, 9", "  syscall", "  sw $t8, 0($v0)", `  sw $v0, ${slot.offset}($fp)`);
+    }
+    for (const slot of frame.slots.filter((candidate) => candidate.kind === "local" && !candidate.sharedCell)) {
+      this.emit(`  sw $zero, ${slot.offset}($fp)`);
     }
   }
   private endFunction(): void {
@@ -379,15 +399,27 @@ class Generator {
     if (!i.result) return this.error("MIPS024", "NEW_OBJECT sin resultado.", i);
     const layout = this.layout(i.result.type) ?? this.layoutsByName.get(String(i.arg1?.value ?? ""));
     if (!layout) return this.error("MIPS025", `No existe layout para ${String(i.arg1?.value ?? "objeto")}.`, i);
-    this.emit(`  li $a0, ${Math.max(4, align(layout.instanceSize, 4))}`, "  li $v0, 9", "  syscall"); this.storeWord("$v0", i.result, i);
+    this.emit(
+      `  li $a0, ${Math.max(4, align(layout.instanceSize, 4))}`,
+      "  li $v0, 9",
+      "  syscall",
+      `  la $t8, ${this.vtableLabel(layout)}`,
+      "  sw $t8, 0($v0)"
+    );
+    this.storeWord("$v0", i.result, i);
   }
   private getField(i: TacInstruction): void {
     if (!i.arg1 || !i.arg2 || !i.result) return this.error("MIPS026", "GET_FIELD incompleto.", i);
     const layout = this.layout(i.arg1.type), name = String(i.arg2.value), method = layout?.methods?.find((candidate) => candidate.name === name);
-    if (method) { const r = this.registers.getReg(); this.emit(`  la ${r}, ${safeLabel(method.label, "closure")}`); this.storeWord(r, i.result, i); return; }
+    if (method) {
+      const a = this.registers.getReg(), r = this.registers.getReg();
+      this.loadWord(i.arg1, a, i); this.checkObject(a);
+      this.emit(`  lw ${r}, 0(${a})`, `  lw ${r}, ${method.slot * 4}(${r})`);
+      this.storeWord(r, i.result, i); return;
+    }
     const field = layout?.fields.find((candidate) => candidate.name === name);
     if (!field) return this.error("MIPS027", `Campo o método desconocido: ${name}.`, i);
-    const a = this.registers.getReg(); this.loadWord(i.arg1, a, i);
+    const a = this.registers.getReg(); this.loadWord(i.arg1, a, i); this.checkObject(a);
     if (primitive(i.result.type, "float")) { this.emit(`  l.s $f2, ${field.offset}(${a})`); this.storeFloat("$f2", i.result, i); }
     else { const r = this.registers.getReg(); this.emit(`  lw ${r}, ${field.offset}(${a})`); this.storeWord(r, i.result, i); }
   }
@@ -395,7 +427,7 @@ class Generator {
     if (!i.arg1 || !i.arg2 || !i.result) return this.error("MIPS028", "SET_FIELD incompleto.", i);
     const field = this.layout(i.arg1.type)?.fields.find((candidate) => candidate.name === String(i.arg2?.value));
     if (!field) return this.error("MIPS029", `Campo desconocido: ${String(i.arg2.value)}.`, i);
-    const a = this.registers.getReg(); this.loadWord(i.arg1, a, i);
+    const a = this.registers.getReg(); this.loadWord(i.arg1, a, i); this.checkObject(a);
     if (primitive(field.type, "float")) { this.loadFloat(i.result, "$f2", i); this.emit(`  s.s $f2, ${field.offset}(${a})`); }
     else { const r = this.registers.getReg(); this.loadWord(i.result, r, i); this.emit(`  sw ${r}, ${field.offset}(${a})`); }
   }
@@ -470,6 +502,11 @@ class Generator {
     if (type?.kind === "class") return this.layoutsById.get(type.classId) ?? this.layoutsByName.get(type.name);
     return undefined;
   }
+  private vtableLabel(layout: ClassLayout): string { return safeLabel(layout.classId, "vtable"); }
+  private checkObject(base: string): void {
+    this.needsObjectChecks = true;
+    this.emit(`  beq ${base}, $zero, __rt_throw_null_object`, "  nop");
+  }
   private stringLabel(value: string): string {
     const known = this.strings.get(value); if (known) return known;
     const label = safeLabel(`string_${this.strings.size}`, "const"); this.strings.set(value, label); this.data.push(`${label}: .asciiz ${quote(value)}`); return label;
@@ -485,7 +522,19 @@ class Generator {
       const boundsMessage = this.stringLabel("Runtime error: array index out of bounds\n");
       this.emit(
         "__rt_throw_null_array:", `  la $v1, ${nullMessage}`, "  j __rt_throw", "  nop",
-        "__rt_throw_array_bounds:", `  la $v1, ${boundsMessage}`, "  j __rt_throw", "  nop",
+        "__rt_throw_array_bounds:", `  la $v1, ${boundsMessage}`, "  j __rt_throw", "  nop"
+      );
+    }
+    if (this.needsObjectChecks) {
+      const nullObjectMessage = this.stringLabel("Runtime error: null object\n");
+      this.emit("__rt_throw_null_object:", `  la $v1, ${nullObjectMessage}`, "  j __rt_throw", "  nop");
+    }
+    if (this.needsDivisionChecks) {
+      const divisionMessage = this.stringLabel("Runtime error: division by zero\n");
+      this.emit("__rt_throw_div_zero:", `  la $v1, ${divisionMessage}`, "  j __rt_throw", "  nop");
+    }
+    if (this.needsArrayChecks || this.needsObjectChecks || this.needsDivisionChecks) {
+      this.emit(
         "__rt_throw:",
         "  lw $t9, __rt_handler",
         "  beq $t9, $zero, __rt_uncaught",

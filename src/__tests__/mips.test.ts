@@ -47,6 +47,26 @@ describe("backend MIPS32 / MARS", () => {
     expect(result.mips.assembly).toMatch(/la \$t8, L_(?:L_)?catch_/);
   });
 
+  it("protege división por cero y objetos nulos mediante el runtime", () => {
+    const source = "class A { let x: integer = 1; } let a: A = null; try { print(1 / 0); print(a.x); } catch (err) { print(err); }";
+    const result = analyzeInput(source, "mips");
+
+    expect(result.mips.status).toBe("completed");
+    expect(result.mips.assembly).toContain("__rt_throw_div_zero:");
+    expect(result.mips.assembly).toContain("__rt_throw_null_object:");
+    expect(result.mips.assembly).toMatch(/beq \$t\d, \$zero, __rt_throw_div_zero/);
+    expect(result.mips.assembly).toMatch(/beq \$t\d, \$zero, __rt_throw_null_object/);
+  });
+
+  it("emite tablas virtuales para despacho dinámico", () => {
+    const source = "class Base { function value(): integer { return 1; } } class Child: Base { function value(): integer { return 2; } } let item: Base = new Child(); print(item.value());";
+    const result = analyzeInput(source, "mips");
+
+    expect(result.mips.status).toBe("completed");
+    expect(result.mips.assembly).toMatch(/vtable_class_\d+:[\s\S]*\.word closure_.*Child_value/);
+    expect(result.mips.assembly).toMatch(/lw \$t\d, 0\(\$t\d\)[\s\S]*lw \$t\d, \d+\(\$t\d\)/);
+  });
+
   it("desmonta el manejador al salir de un try mediante break", () => {
     const result = analyzeInput("while (true) { try { break; } catch (err) { print(err); } } print(7);", "mips");
     expect(result.mips.status).toBe("completed");

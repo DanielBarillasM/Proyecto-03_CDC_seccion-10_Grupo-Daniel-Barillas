@@ -142,7 +142,7 @@ npm.cmd run mars:setup
 npm.cmd test
 ```
 
-El comando verifica SHA-256 y guarda el JAR en `tools/Mars4_5.jar`, excluido de Git. La suite ejecuta las regresiones de salida cuando encuentra ese archivo o `MARS_JAR`. Sin JAR, esas pruebas se omiten; con `REQUIRE_MARS=1`, su ausencia hace fallar la suite. CI instala Java 17, descarga el JAR verificado y exige estas pruebas en cada pull request, push a `main` y release.
+El comando verifica SHA-256 y guarda el JAR en `tools/Mars4_5.jar`, excluido de Git. La suite ejecuta las regresiones de salida cuando encuentra ese archivo o `MARS_JAR` y Java está disponible. Sin cualquiera de los dos requisitos, esas pruebas se omiten; con `REQUIRE_MARS=1`, su ausencia hace fallar la suite. CI instala Java 17, descarga el JAR verificado y exige estas pruebas en cada pull request, push a `main` y release.
 
 MARS es una herramienta externa y no se incluye dentro del repositorio. En el equipo de desarrollo, el archivo está ubicado en:
 

@@ -587,6 +587,39 @@ class TacGenerator {
         .map((member) => member.functionDeclaration())
         .find((fn) => fn?.Identifier().text === "constructor");
 
+      const initializeParent = () => {
+        const classType = this.resolveSymbol(name)?.type;
+        const layout = this.classLayouts.find((candidate) => classType?.kind === "class" && candidate.classId === classType.classId);
+        const parentLayout = layout?.parentClassId
+          ? this.classLayouts.find((candidate) => candidate.classId === layout.parentClassId)
+          : undefined;
+        const parentConstructor = parentLayout?.methods?.find((method) => method.name === "constructor");
+        if (!parentConstructor) return;
+
+        const childParameters = explicitConstructor?.parameters()?.parameter() ?? [];
+        const parentParameters = parentConstructor.parameters ?? [];
+        if (childParameters.length < parentParameters.length) {
+          this.diagnostics.push({
+            code: "TAC_CONSTRUCTOR_PARENT_ARGUMENTS",
+            severity: "error",
+            message: `El constructor de '${name}' necesita reenviar ${parentParameters.length} argumento(s) al constructor de '${parentLayout?.name ?? "la clase padre"}'.`,
+            line: ctx.start.line,
+            column: ctx.start.charPositionInLine + 1
+          });
+          return;
+        }
+
+        this.emit("PARAM", { arg1: this.readIdentifier("this", ctx) }, ctx);
+        parentParameters.forEach((_parameter, index) => {
+          const parameterName = childParameters[index].Identifier().text;
+          this.emit("PARAM", { arg1: this.readIdentifier(parameterName, childParameters[index]) }, childParameters[index]);
+        });
+        this.emit("CALL", {
+          arg1: tacOperand(parentConstructor.label, "symbol"),
+          arg2: tacOperand(parentParameters.length + 1)
+        }, ctx);
+      };
+
       if (!explicitConstructor) this.implicitConstructor(ctx, name, initializeFields);
 
       for (const member of ctx.classMember()) {
@@ -594,7 +627,10 @@ class TacGenerator {
         if (fn) {
           this.functionDeclaration(
             fn,
-            fn.Identifier().text === "constructor" ? () => initializeFields() : undefined
+            fn.Identifier().text === "constructor" ? () => {
+              initializeParent();
+              initializeFields();
+            } : undefined
           );
         }
       }
@@ -1072,7 +1108,7 @@ class TacGenerator {
       const cached = cache.get(classSymbol.id);
       if (cached) return cached;
       if (visiting.has(classSymbol.id)) {
-        return { name: classSymbol.name, classId: classSymbol.id, fields: [], methods: [], instanceSize: 0 };
+        return { name: classSymbol.name, classId: classSymbol.id, fields: [], methods: [], instanceSize: 4 };
       }
       visiting.add(classSymbol.id);
       const parent = classSymbol.parentClass
@@ -1086,7 +1122,9 @@ class TacGenerator {
       const ownMembers = classScope
         ? this.semantic.symbols.filter((symbol) => symbol.scopeId === classScope.id)
         : [];
-      let offset = parentLayout?.instanceSize ?? 0;
+      // El primer word de cada instancia apunta a su tabla virtual. Las clases
+      // derivadas conservan los offsets heredados y agregan campos al final.
+      let offset = parentLayout?.instanceSize ?? 4;
       for (const field of ownMembers.filter((symbol) => symbol.kind === "field")) {
         const size = storageSize(field.type);
         const alignment = storageAlignment(field.type);
@@ -1102,6 +1140,7 @@ class TacGenerator {
         const entry = {
           name: method.name,
           label,
+          slot: inherited >= 0 ? methods[inherited].slot : methods.length,
           symbolId: method.id,
           parameters: method.parameters?.map((parameter) => ({ ...parameter })) ?? []
         };
@@ -1114,6 +1153,7 @@ class TacGenerator {
         const implicitConstructor = {
           name: "constructor",
           label: `fn_${classSymbol.id}_${classSymbol.name}_constructor`,
+          slot: inherited >= 0 ? methods[inherited].slot : methods.length,
           parameters: inheritedConstructor?.parameters?.map((parameter) => ({ ...parameter })) ?? []
         };
         if (inherited >= 0) methods[inherited] = implicitConstructor;

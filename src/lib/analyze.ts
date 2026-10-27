@@ -25,6 +25,7 @@ import { emptyMipsResult, generateMips } from "../mips/generator";
 
 /** Identificador visible del motor usado por la interfaz y la CLI. */
 export const ANALYZER_ENGINE = "ANTLR 4 / antlr4ts (código generado)";
+const MAX_STRUCTURAL_DEPTH = 256;
 
 /**
  * Ejecuta el pipeline real de ANTLR para Compiscript.
@@ -78,6 +79,49 @@ export function analyzeInput(
         semanticErrorCount: 0,
         semanticWarningCount: 0,
         totalErrorCount: lexicalErrors.length,
+        symbolCount: 0,
+        scopeCount: 0
+      }
+    };
+  }
+
+  // ANTLR y los visitors usan recursión para expresiones agrupadas. Se corta
+  // una entrada patológicamente profunda antes de que pueda desbordar la pila
+  // de JavaScript y se devuelve un diagnóstico normal del compilador.
+  const depthError = findStructuralDepthError(tokens);
+  if (depthError) {
+    const semanticRequested = mode === "semantic" || mode === "tac" || mode === "mips";
+    const tacRequested = mode === "tac" || mode === "mips";
+    return {
+      language: "Compiscript",
+      mode,
+      accepted: false,
+      tokens,
+      lexicalErrors,
+      syntaxErrors: [depthError],
+      parseTreeText: "",
+      formattedParseTree: "",
+      parseTreeNodes: [],
+      semantic: emptySemanticResult(
+        semanticRequested ? "skipped" : "not-requested",
+        semanticRequested ? "Análisis semántico omitido: la estructura del programa excede el límite seguro." : undefined
+      ),
+      tac: emptyTacResult(
+        tacRequested ? "skipped" : "not-requested",
+        tacRequested ? "Código intermedio no generado: la estructura del programa excede el límite seguro." : undefined
+      ),
+      mips: emptyMipsResult(
+        mode === "mips" ? "skipped" : "not-requested",
+        mode === "mips" ? "Código MIPS no generado: la estructura del programa excede el límite seguro." : "La fase MIPS no fue solicitada."
+      ),
+      explanation: `El archivo excede la profundidad estructural máxima de ${MAX_STRUCTURAL_DEPTH} niveles.`,
+      summary: {
+        tokenCount: tokens.length,
+        lexicalErrorCount: lexicalErrors.length,
+        syntaxErrorCount: 1,
+        semanticErrorCount: 0,
+        semanticWarningCount: 0,
+        totalErrorCount: lexicalErrors.length + 1,
         symbolCount: 0,
         scopeCount: 0
       }
@@ -308,6 +352,25 @@ function collectTokenInfo(
       column: token.charPositionInLine + 1,
       channel: token.channel
     }));
+}
+
+function findStructuralDepthError(tokens: TokenInfo[]): AnalyzeError | undefined {
+  let depth = 0;
+  for (const token of tokens) {
+    if (token.text === "(" || token.text === "[" || token.text === "{") depth += 1;
+    else if (token.text === ")" || token.text === "]" || token.text === "}") depth = Math.max(0, depth - 1);
+    if (depth > MAX_STRUCTURAL_DEPTH) {
+      return {
+        source: "parser",
+        line: token.line,
+        column: token.column,
+        offendingSymbol: token.text,
+        severity: "error",
+        message: `La estructura excede el límite seguro de ${MAX_STRUCTURAL_DEPTH} niveles de anidamiento.`
+      };
+    }
+  }
+  return undefined;
 }
 
 function buildExplanation(

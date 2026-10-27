@@ -81,7 +81,7 @@ El Proyecto 3 completa un compilador educativo para Compiscript. Conserva el lex
 
 El producto se presenta como una interfaz gr\'afica React con editor Monaco. El usuario puede escribir o seleccionar un archivo \archivo{.cps}, ejecutar el pipeline, observar diagn\'osticos y examinar tokens, CST, \'arbol sem\'antico, s\'imbolos, \'ambitos, TAC, bloques b\'asicos, registros de activaci\'on y ensamblador. La exportaci\'on MIPS se habilita solamente cuando todas las fases terminan correctamente.
 
-El backend implementa convenci\'on de llamadas mediante pila, asignaci\'on local de registros, aritm\'etica entera y flotante, control de flujo, funciones, llamadas anidadas, recursi\'on, arreglos, objetos, m\'etodos, strings, closures y recuperaci\'on de errores de ejecuci\'on mediante \codigo{try/catch}. La suite define 35 casos de ejecuci\'on MARS y el workflow los exige con Java 17.
+El backend implementa convenci\'on de llamadas mediante pila, asignaci\'on local de registros, aritm\'etica entera y flotante, control de flujo, funciones, llamadas anidadas, recursi\'on, arreglos, objetos, m\'etodos con despacho din\'amico, strings, closures y recuperaci\'on de errores de ejecuci\'on mediante \codigo{try/catch}. La suite define 41 casos de ejecuci\'on MARS y el workflow los exige con Java 17.
 
 \chapter{Fundamentos te\'oricos}
 
@@ -173,7 +173,7 @@ PRINT & syscall & seleccionado por tipo\\
 
 \section{Datos compuestos}
 
-Los arreglos guardan longitud en el primer word y elementos desde el segundo. Los objetos reservan \codigo{ClassLayout.instanceSize}; los campos usan offsets calculados en TAC. Los m\'etodos se convierten en direcciones de etiqueta. Un closure reserva un puntero a funci\'on seguido de sus capturas y usa \codigo{\$s7} como entorno activo.
+Los arreglos guardan longitud en el primer word y elementos desde el segundo. Los objetos reservan \codigo{ClassLayout.instanceSize}; el primer word apunta a una vtable y los campos usan offsets calculados en TAC. Cada m\'etodo ocupa un slot estable heredable, de modo que una sobrescritura despacha seg\'un la clase real del receptor. Un closure reserva un puntero a funci\'on seguido de sus capturas y usa \codigo{\$s7} como entorno activo.
 
 \section{Strings y flotantes}
 
@@ -209,11 +209,11 @@ El script \archivo{scripts/run-mars.mjs} busca el JAR en el segundo argumento, e
 
 \section{Suite automatizada}
 
-La suite final contiene 221 casos en 15 archivos: 186 se ejecutan sin herramientas externas y 35 validan la salida real en MARS cuando Java y el JAR est\'an disponibles. Las pruebas del backend verifican generaci\'on completa, convenci\'on de pila, arreglos, runtime de strings, llamadas anidadas, closures, recuperaci\'on de \texttt{try/catch}, bloqueo por errores y mirilla. Las pruebas heredadas contin\'uan verificando lexer, parser, sem\'antica, s\'imbolos, TAC, CFG, UI y la exportaci\'on del modo MIPS.
+La suite final contiene 232 casos en 15 archivos: 191 se ejecutan sin herramientas externas y 41 validan la salida real en MARS cuando Java y el JAR est\'an disponibles. Las pruebas del backend verifican generaci\'on completa, convenci\'on de pila, arreglos, runtime de strings, llamadas anidadas, closures, despacho din\'amico, constructores heredados, errores de objeto nulo y divisi\'on entre cero, recuperaci\'on de \texttt{try/catch}, bloqueo por errores y mirilla. Las pruebas heredadas contin\'uan verificando lexer, parser, sem\'antica, s\'imbolos, TAC, CFG, UI y la exportaci\'on del modo MIPS.
 
 \section{Validaci\'on real en MARS}
 
-La suite de integraci\'on contiene 35 escenarios MARS, incluidos resultados positivos, errores de arreglos y capturas mediante \codigo{try/catch}. El workflow instala Java 17, prepara MARS 4.5 y exige todos los escenarios. Algunos resultados representativos son:
+La suite de integraci\'on contiene 41 escenarios MARS, incluidos resultados positivos, errores de arreglos y objetos, divisi\'on entre cero, despacho din\'amico, constructores heredados y capturas mediante \codigo{try/catch}. El workflow instala Java 17, prepara MARS 4.5 y exige todos los escenarios. Algunos resultados representativos son:
 
 \begin{longtable}{p{7cm}p{5cm}}
 \toprule
@@ -242,7 +242,7 @@ npm run cli:mips
 npm audit
 \end{verbatim}
 
-TypeScript, 186 pruebas locales y el build terminan correctamente; 35 escenarios MARS quedan condicionados a Java/MARS y son obligatorios en CI. La auditor\'ia completa de dependencias reporta cero vulnerabilidades.
+TypeScript, 191 pruebas independientes de herramientas externas y el build terminan correctamente; los 41 escenarios MARS tambi\'en fueron ejecutados y son obligatorios en CI. La auditor\'ia completa de dependencias reporta cero vulnerabilidades.
 
 \chapter{Trazabilidad con el enunciado}
 
@@ -257,7 +257,7 @@ Resultados dentro de GUI & Cumple & paneles de fases, TAC y MIPS\\
 M\'ultiples errores y recuperaci\'on & Cumple & listeners, estrategia ANTLR y visitors\\
 No TAC/MIPS ante errores & Cumple & estados y pruebas negativas\\
 Mirilla & Cumple & optimizador y m\'etricas\\
-Ensamblador ejecutable & Cumple & 35 escenarios MARS exigidos en CI\\
+Ensamblador ejecutable & Cumple & 41 escenarios MARS aprobados y exigidos en CI\\
 No c\'odigo objeto ni ejecuci\'on interna & Cumple & exportaci\'on a herramienta externa\\
 \bottomrule
 \end{longtable}

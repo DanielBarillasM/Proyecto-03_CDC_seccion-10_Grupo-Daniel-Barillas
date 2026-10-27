@@ -97,7 +97,9 @@ Un arreglo reserva `(longitud + 1) * 4` bytes. El primer word conserva la longit
 
 Las lecturas y escrituras verifican referencia no nula y `0 <= i < longitud` antes de calcular la dirección. La lectura de longitud también verifica nulos. Un fallo imprime un diagnóstico y termina antes de acceder a memoria.
 
-Un objeto reserva al menos `ClassLayout.instanceSize`. `GET_FIELD` y `SET_FIELD` usan el offset resuelto durante TAC. Los layouts y las etiquetas distinguen la identidad de cada declaración, incluso entre clases homónimas. Un método se materializa como descriptor de función y se invoca con `jalr`; el receptor se pasa como primer parámetro.
+Un objeto reserva al menos `ClassLayout.instanceSize`. El primer word apunta a la vtable de su clase real y los campos comienzan después de ese encabezado. `GET_FIELD` y `SET_FIELD` usan el offset resuelto durante TAC y validan que el receptor no sea `null`. Los layouts y las etiquetas distinguen la identidad de cada declaración, incluso entre clases homónimas.
+
+Cada método tiene un slot estable heredable. Una sobrescritura conserva el slot del método base y la vtable de la clase hija guarda el descriptor nuevo; por ello una llamada mediante una referencia de tipo base despacha según la clase real del objeto. El descriptor se carga desde la vtable y se invoca con `jalr`; el receptor se pasa como primer parámetro.
 
 Todo valor de función usa un descriptor cuyo word 0 es la dirección de código. Las funciones sin capturas usan descriptores estáticos; los closures reservan descriptores en heap. Desde el word 1 se guardan punteros a celdas compartidas, no copias de los valores. El propietario reserva estas celdas al entrar en la función y tanto el propietario como sus closures acceden al mismo contenido. Las capturas transitivas conservan los punteros originales.
 
@@ -135,4 +137,4 @@ java -jar Mars4_5.jar nc ae1 factorial.asm
 
 ## Límites conscientes
 
-`try/catch` instala un registro dinámico de manejo con el handler anterior, `$sp`, `$fp`, `$s7` y la etiqueta de captura. Los errores de arreglo nulo o fuera de límites restauran ese contexto antes de saltar al `catch`, incluso si se originan dentro de una llamada anidada. El identificador de captura recibe el mensaje de error como `string`. Compiscript todavía no incluye una sentencia `throw`, por lo que el runtime solo eleva las excepciones definidas por el backend.
+`try/catch` instala un registro dinámico de manejo con el handler anterior, `$sp`, `$fp`, `$s7` y la etiqueta de captura. Los errores de arreglo nulo o fuera de límites, objeto nulo y división entre cero restauran ese contexto antes de saltar al `catch`, incluso si se originan dentro de una llamada anidada. El identificador de captura recibe el mensaje de error como `string`. Compiscript todavía no incluye una sentencia `throw`, por lo que el runtime solo eleva las excepciones definidas por el backend.

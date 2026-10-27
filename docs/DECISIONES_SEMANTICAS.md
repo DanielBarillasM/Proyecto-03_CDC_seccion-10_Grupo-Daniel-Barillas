@@ -58,6 +58,8 @@ No se convierten implícitamente números, booleanos u objetos a `string`.
 
 `null` puede asignarse a referencias de instancia y arreglos. Los tipos primitivos (`integer`, `float`, `boolean`, `string`) no reciben `null` implícitamente. En igualdad (`==`/`!=`), `null` solo es comparable con otro `null`, un arreglo o una instancia; no funciona como comodín para primitivos.
 
+Los arreglos son mutables y, por ello, su asignabilidad es invariante: `Hija[]` no puede asignarse a `Base[]`, aunque `Hija` herede de `Base`. Esto impide que una referencia aparentemente `Base[]` escriba una instancia incompatible dentro del arreglo original.
+
 ## 7. Ámbitos y shadowing
 
 Se crean ámbitos para:

@@ -96,6 +96,8 @@ export interface ClassLayout {
   methods?: {
     name: string;
     label: string;
+    /** Posición estable dentro de la tabla virtual de la clase. */
+    slot: number;
     symbolId?: string;
     parameters?: { name: string; type: SemanticType }[];
   }[];

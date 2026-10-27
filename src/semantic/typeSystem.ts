@@ -34,7 +34,8 @@ export type ClassHierarchyLookup = (child: string, parent: string) => boolean;
  * - `error`/`unknown` en cualquiera de los dos lados nunca genera un nuevo
  *   diagnóstico (se consideran compatibles para evitar cascadas).
  * - `integer` puede promoverse a `float`, pero no al revés.
- * - Los arreglos son covariantes en su tipo de elemento.
+ * - Los arreglos mutables son invariantes para impedir que un alias de una
+ *   superclase inserte valores incompatibles en un arreglo de subclase.
  * - Las instancias son asignables a su propio tipo o al de una superclase.
  * - `null` es asignable a cualquier tipo de instancia o arreglo.
  */
@@ -57,7 +58,10 @@ export function isAssignable(
   }
 
   if (isArrayType(target) && isArrayType(source)) {
-    return isAssignable(target.element, source.element, isSubclassOf);
+    // `[]` se infiere como unknown[] y puede adoptar el tipo contextual. Para
+    // arreglos concretos se exige igualdad estructural: son mutables.
+    if (isAbsorbing(target.element) || isAbsorbing(source.element)) return true;
+    return typesEqual(target.element, source.element);
   }
 
   if (isInstanceType(target) && isInstanceType(source)) {

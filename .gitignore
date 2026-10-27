@@ -16,6 +16,8 @@ node_modules/
 .task-npm-cache/
 tools/*.jar
 .mars-test-*/
+src/generated/*.interp
+src/generated/*.tokens
 dist/
 release/
 .playwright-cli/

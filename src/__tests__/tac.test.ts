@@ -203,4 +203,33 @@ describe("TAC core", () => {
     expect(calls).toEqual(expect.arrayContaining(constructorLabels));
     expect(childFieldInitialization?.arg1?.value).toBe("this");
   });
+
+  it("chains the parent from an explicit child constructor", () => {
+    const result = analyzeInput(
+      `
+        class Base { let x: integer = 41; }
+        class Child: Base {
+          let y: integer = 1;
+          function constructor() { this.y = 2; }
+        }
+        let child = new Child();
+      `,
+      "tac"
+    );
+    const baseConstructor = result.tac.classLayouts
+      .find((layout) => layout.name === "Base")!
+      .methods!.find((method) => method.name === "constructor")!.label;
+    const childConstructorBegin = result.tac.instructions.findIndex(
+      (instruction) => instruction.op === "FUNC_BEGIN" && String(instruction.result?.value).includes("Child_constructor")
+    );
+    const childConstructorEnd = result.tac.instructions.findIndex(
+      (instruction, index) => index > childConstructorBegin && instruction.op === "FUNC_END"
+    );
+    const childBody = result.tac.instructions.slice(childConstructorBegin, childConstructorEnd + 1);
+
+    expect(result.tac.status).toBe("completed");
+    expect(childBody).toEqual(expect.arrayContaining([
+      expect.objectContaining({ op: "CALL", arg1: expect.objectContaining({ value: baseConstructor }) })
+    ]));
+  });
 });

@@ -592,4 +592,18 @@ describe("Análisis semántico — ámbitos de clases e inferencia", () => {
       expect(result.semantic.symbols.find((symbol) => symbol.name === name)?.references.length).toBeGreaterThan(0);
     }
   });
+
+  it("mantiene invariantes los arreglos mutables de clases", () => {
+    const result = analyze(`
+      class Base { let x: integer = 1; }
+      class Child: Base { let y: integer = 2; }
+      let children: Child[] = [new Child()];
+      let bases: Base[] = children;
+    `);
+
+    expect(result.semantic.errors).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: "SEM003" })
+    ]));
+    expect(result.accepted).toBe(false);
+  });
 });

@@ -55,4 +55,17 @@ describe("analizador sintáctico de Compiscript", () => {
     expect(result.syntaxErrors[99].message).toContain("límite de 100 diagnósticos");
     expect(result.parseTreeText).toContain("<EOF>");
   });
+
+  it("rechaza profundidad patológica sin desbordar la pila", () => {
+    const depth = 500;
+    const result = analyzeInput(`print(${"(".repeat(depth)}1${")".repeat(depth)});`, "mips");
+
+    expect(result.accepted).toBe(false);
+    expect(result.syntaxErrors).toHaveLength(1);
+    expect(result.syntaxErrors[0].message).toContain("límite seguro de 256");
+    expect(result.semantic.status).toBe("skipped");
+    expect(result.tac.status).toBe("skipped");
+    expect(result.mips.status).toBe("skipped");
+    expect(result.mips.assembly).toBe("");
+  });
 });

@@ -7,9 +7,14 @@ import recursionSource from "../../examples/mips/07_recursion.cps?raw";
 import integralSource from "../../examples/tac/13_programa_integral.cps?raw";
 
 const jar = resolve(process.env.MARS_JAR ?? "tools/Mars4_5.jar");
+const javaProbe = spawnSync("java", ["-version"], { encoding: "utf8", timeout: 5000 });
+const javaAvailable = !javaProbe.error && javaProbe.status === 0;
 
 it("requires MARS when execution validation is requested", () => {
-  if (process.env.REQUIRE_MARS === "1") expect(existsSync(jar)).toBe(true);
+  if (process.env.REQUIRE_MARS === "1") {
+    expect(existsSync(jar)).toBe(true);
+    expect(javaAvailable).toBe(true);
+  }
 });
 
 const cases = [
@@ -48,9 +53,15 @@ const cases = [
   ["null array write", "let a: integer[] = null; a[0] = 1;", "Runtime error: null array"],
   ["caught array error", "try { let a = [1]; print(a[2]); } catch (err) { print(err); }", "Runtime error: array index out of bounds"],
   ["caught error across a call", "function fail() { let a: integer[] = null; print(a[0]); } try { fail(); } catch (err) { print(err); }", "Runtime error: null array"],
+  ["caught null object", "class A { let x: integer = 7; } let a: A = null; try { print(a.x); } catch (err) { print(err); }", "Runtime error: null object"],
+  ["caught integer division by zero", "try { print(1 / 0); } catch (err) { print(err); }", "Runtime error: division by zero"],
+  ["caught float division by zero", "try { print(1.0 / 0.0); } catch (err) { print(err); }", "Runtime error: division by zero"],
+  ["explicit child constructor initializes parent", "class Base { let x: integer = 41; } class Child: Base { let y: integer = 1; function constructor() { this.y = 2; } } let c = new Child(); print(c.x); print(c.y);", "41\n2"],
+  ["dynamic method dispatch", "class Base { function value(): integer { return 1; } } class Child: Base { function value(): integer { return 2; } } let item: Base = new Child(); print(item.value());", "2"],
+  ["uninitialized locals are deterministic", "function value(): integer { let x: integer; return x; } print(value());", "0"],
 ] as const;
 
-describe.skipIf(!existsSync(jar))("MARS output regressions", () => {
+describe.skipIf(!existsSync(jar) || !javaAvailable)("MARS output regressions", () => {
   it.each(cases)("%s", (_name, source, output) => {
     const result = analyzeInput(source, "mips");
     expect(result.semantic.errors).toEqual([]);
