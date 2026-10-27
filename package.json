@@ -39,7 +39,8 @@
     "cli:tac": "tsx src/cli/run.ts examples/tac/13_programa_integral.cps --mode tac",
     "cli:mips": "tsx src/cli/run.ts examples/mips/01_aritmetica.cps --mode mips",
     "mars": "node scripts/run-mars.mjs",
-    "mars:setup": "node scripts/setup-mars.mjs"
+    "mars:setup": "node scripts/setup-mars.mjs",
+    "assets:render": "electron scripts/render-assets.cjs"
   },
   "build": {
     "appId": "gt.edu.uvg.dlpantlr",

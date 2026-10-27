@@ -13,49 +13,67 @@
 \usepackage{fancyhdr}
 \usepackage{enumitem}
 
-\geometry{margin=2.4cm}
-\definecolor{amarillo}{HTML}{FFD426}
-\definecolor{crema}{HTML}{FFF9EC}
-\definecolor{verde}{HTML}{32D583}
-\definecolor{negro}{HTML}{111111}
-\definecolor{gris}{HTML}{F2F2F2}
-\hypersetup{pdftitle={Compiscript MIPS Compiler IDE -- Proyecto 3},pdfauthor={Pablo Daniel Barillas Moreno}}
-\pagestyle{fancy}\fancyhf{}\fancyhead[L]{Compiscript MIPS Compiler IDE}\fancyhead[R]{Proyecto 3}\fancyfoot[C]{\thepage}
-\setlength{\headheight}{14pt}
+\geometry{top=2.45cm,bottom=2.35cm,left=2.35cm,right=2.35cm}
+\definecolor{violeta}{HTML}{6D5DFC}
+\definecolor{violetaoscuro}{HTML}{4937D3}
+\definecolor{cian}{HTML}{087F8C}
+\definecolor{verde}{HTML}{087F5B}
+\definecolor{tinta}{HTML}{11172A}
+\definecolor{muted}{HTML}{66708B}
+\definecolor{gris}{HTML}{EEF2FB}
+\definecolor{borde}{HTML}{D9E0F1}
+\hypersetup{pdftitle={Compiscript Studio -- Proyecto 3},pdfauthor={Pablo Daniel Barillas Moreno},colorlinks=true,linkcolor=violetaoscuro,urlcolor=cian,citecolor=verde}
+\color{tinta}
+\pagestyle{fancy}\fancyhf{}\fancyhead[L]{\textcolor{violetaoscuro}{\textbf{COMPISCRIPT STUDIO}}}\fancyhead[R]{\textcolor{muted}{Proyecto 3 · MIPS32}}\fancyfoot[L]{\textcolor{muted}{Daniel-Barillas · 22193}}\fancyfoot[R]{\textcolor{violetaoscuro}{\thepage}}
+\renewcommand{\headrulewidth}{0.4pt}\renewcommand{\headrule}{\hbox to\headwidth{\color{borde}\leaders\hrule height \headrulewidth\hfill}}
+\renewcommand{\footrulewidth}{0.4pt}\renewcommand{\footrule}{\hbox to\headwidth{\color{borde}\leaders\hrule height \footrulewidth\hfill}}
+\setlength{\headheight}{24pt}
 \setlist{itemsep=2pt,topsep=4pt}
 \newcommand{\codigo}[1]{\texttt{#1}}
-\newcommand{\archivo}[1]{\texttt{\detokenize{#1}}}
+\newcommand{\archivo}[1]{\path{#1}}
+\makeatletter
+\renewcommand{\@makechapterhead}[1]{\vspace*{-12pt}{\color{violeta}\rule{1.1cm}{4pt}}\par\vspace{12pt}{\Large\color{muted}\sffamily\bfseries CAPÍTULO \thechapter}\par\vspace{5pt}{\Huge\color{tinta}\sffamily\bfseries #1}\par\vspace{12pt}{\color{borde}\hrule}\vspace{24pt}}
+\renewcommand{\@makeschapterhead}[1]{\vspace*{-12pt}{\color{violeta}\rule{1.1cm}{4pt}}\par\vspace{12pt}{\Huge\color{tinta}\sffamily\bfseries #1}\par\vspace{12pt}{\color{borde}\hrule}\vspace{24pt}}
+\makeatother
 
 \begin{document}
+\pagenumbering{gobble}
 
 \begin{titlepage}
-  \pagecolor{crema}\color{negro}
+  \pagecolor{gris}\color{tinta}
   \centering
-  \vspace*{1.5cm}
-  {\Large Universidad del Valle de Guatemala\par}
-  \vspace{0.4cm}
-  {\large Construcci\'on de Compiladores -- Secci\'on 10\par}
-  \vspace{2cm}
-  \fcolorbox{negro}{amarillo}{\parbox[c][2.4cm][c]{11cm}{\centering\bfseries\fontsize{25}{28}\selectfont COMPISCRIPT\\MIPS COMPILER IDE}}
-  \vspace{1.4cm}
+  \vspace*{1.1cm}
+  {\color{violeta}\rule{\textwidth}{7pt}\par}
+  \vspace{0.8cm}
+  {\Large\bfseries Universidad del Valle de Guatemala\par}
+  \vspace{0.25cm}
+  {\large\color{muted} Construcci\'on de Compiladores · Secci\'on 10\par}
+  \vspace{1.7cm}
+  \fcolorbox{borde}{white}{\parbox[c][3.1cm][c]{12.2cm}{\centering{\color{violetaoscuro}\sffamily\bfseries\Huge COMPISCRIPT STUDIO}\par\vspace{0.22cm}{\color{cian}\large ANTLR · TAC · MIPS32 · MARS}}}
+  \vspace{1.2cm}
 
-  {\Huge\bfseries Informe t\'ecnico\par}
-  \vspace{0.3cm}
-  {\LARGE Proyecto 3: generaci\'on de c\'odigo ensamblador\par}
+  {\Huge\sffamily\bfseries Informe t\'ecnico\par}
+  \vspace{0.35cm}
+  {\LARGE\color{muted} Proyecto 3 · Generaci\'on de c\'odigo ensamblador\par}
   \vfill
   \begin{tabular}{rl}
     Grupo: & Daniel-Barillas\\
     Integrante: & Pablo Daniel Barillas Moreno\\
     Carn\'e: & 22193\\
     Versi\'on: & 3.0.0\\
-    Fecha: & 20 de octubre de 2026
+    Fecha: & 27 de octubre de 2026
   \end{tabular}
   \vfill
-  {\large Compiscript $\rightarrow$ TAC $\rightarrow$ MIPS32 $\rightarrow$ MARS 4.5\par}
+  {\color{violetaoscuro}\large\bfseries Compiscript $\rightarrow$ TAC $\rightarrow$ MIPS32 $\rightarrow$ MARS 4.5\par}
+  \vspace{0.55cm}
+  {\color{violeta}\rule{\textwidth}{3pt}\par}
 \end{titlepage}
 \nopagecolor
 
+\pagenumbering{roman}
 \tableofcontents
+\clearpage
+\pagenumbering{arabic}
 
 \chapter{Resumen ejecutivo}
 
@@ -63,7 +81,7 @@ El Proyecto 3 completa un compilador educativo para Compiscript. Conserva el lex
 
 El producto se presenta como una interfaz gr\'afica React con editor Monaco. El usuario puede escribir o seleccionar un archivo \archivo{.cps}, ejecutar el pipeline, observar diagn\'osticos y examinar tokens, CST, \'arbol sem\'antico, s\'imbolos, \'ambitos, TAC, bloques b\'asicos, registros de activaci\'on y ensamblador. La exportaci\'on MIPS se habilita solamente cuando todas las fases terminan correctamente.
 
-El backend implementa convenci\'on de llamadas mediante pila, asignaci\'on local de registros, aritm\'etica entera y flotante, control de flujo, funciones, llamadas anidadas, recursi\'on, arreglos, objetos, m\'etodos, strings y closures. La salida fue ensamblada y ejecutada en el MARS 4.5 oficial con quince programas positivos.
+El backend implementa convenci\'on de llamadas mediante pila, asignaci\'on local de registros, aritm\'etica entera y flotante, control de flujo, funciones, llamadas anidadas, recursi\'on, arreglos, objetos, m\'etodos, strings, closures y recuperaci\'on de errores de ejecuci\'on mediante \codigo{try/catch}. La suite define 35 casos de ejecuci\'on MARS y el workflow los exige con Java 17.
 
 \chapter{Fundamentos te\'oricos}
 
@@ -73,14 +91,7 @@ Un compilador transforma un lenguaje fuente en una representaci\'on destino medi
 
 \begin{figure}[ht]
 \centering
-\small
-\setlength{\fboxsep}{5pt}
-\colorbox{amarillo}{\textbf{Compiscript}} $\longrightarrow$
-\colorbox{amarillo}{\textbf{Lexer}} $\longrightarrow$
-\colorbox{amarillo}{\textbf{Parser}} $\longrightarrow$
-\colorbox{amarillo}{\textbf{Sem\'antica}} $\longrightarrow$
-\colorbox{amarillo}{\textbf{TAC}} $\longrightarrow$
-\colorbox{verde}{\textbf{MIPS32}}
+\includegraphics[width=\textwidth]{../assets/compiscript-project3-pipeline.png}
 \caption{Pipeline completo de la versi\'on 3.0.0.}
 \end{figure}
 
@@ -110,15 +121,7 @@ Cada llamada necesita un frame independiente para soportar recursi\'on. El tama\
 
 \begin{figure}[ht]
 \centering
-\renewcommand{\arraystretch}{1.5}
-\begin{tabular}{|>{\centering\arraybackslash}p{9cm}|}\hline
-\colorbox{amarillo}{\parbox{8.5cm}{\centering\textbf{argumentos del llamador}}}\\\hline
-\codigo{\$ra} guardado\\\hline
-\codigo{\$fp} anterior\\\hline
-\codigo{\$s7} / entorno anterior\\\hline
-par\'ametros y variables locales\\\hline
-\colorbox{verde!35}{\parbox{8.5cm}{\centering\textbf{temporales TAC $\leftarrow$ \$fp = \$sp}}}\\\hline
-\end{tabular}
+\includegraphics[width=0.96\textwidth]{../assets/compiscript-project3-stack.png}
 \caption{Organizaci\'on conceptual del frame.}
 \end{figure}
 
@@ -128,7 +131,9 @@ El llamador apila argumentos de izquierda a derecha. La funci\'on reserva el fra
 
 \section{Contrato del backend}
 
-\archivo{src/mips/generator.ts} expone \codigo{generateMips(tac)}. El resultado usa estados expl\'icitos: \codigo{not-requested}, \codigo{skipped}, \codigo{completed} y \codigo{failed}. Un ensamblador parcial nunca se presenta como listo.
+El m\'odulo \archivo{src/mips/generator.ts} contiene la funci\'on p\'ublica \codigo{generateMips(tac)}.
+
+El resultado usa cuatro estados: \codigo{not-requested}, \codigo{skipped}, \codigo{completed} y \codigo{failed}. Un ensamblador parcial nunca se presenta como listo.
 
 \begin{longtable}{p{3cm}p{10cm}}
 \toprule
@@ -186,6 +191,8 @@ El pipeline visual usa el estado real de cada fase. MIPS aparece como omitido an
 
 El selector de archivos est\'a dentro de la GUI y acepta \archivo{.cps}. Los resultados se muestran en la misma interfaz; la consola no es necesaria para la evaluaci\'on funcional.
 
+La interfaz renovada conserva el flujo del compilador y reorganiza su presentaci\'on como un workbench: barra superior unificada, controles compactos, editor central, explorador lateral e inspector vertical. El sistema visual emplea superficies transl\'ucidas, radios consistentes y acentos violeta, cian y verde. El tema claro mantiene la misma jerarqu\'ia mediante fondos azulados suaves, contraste oscuro y paneles blancos transl\'ucidos, sin perder legibilidad ni estados sem\'anticos.
+
 \chapter{CLI y ejecuci\'on externa}
 
 La CLI comparte \codigo{analyzeInput}; no posee un compilador alterno. El modo MIPS acepta \codigo{--out}:
@@ -206,7 +213,7 @@ La suite final contiene 221 casos en 15 archivos: 186 se ejecutan sin herramient
 
 \section{Validaci\'on real en MARS}
 
-Se ejecutaron quince programas positivos en MARS 4.5. Algunos resultados representativos son:
+La suite de integraci\'on contiene 35 escenarios MARS, incluidos resultados positivos, errores de arreglos y capturas mediante \codigo{try/catch}. El workflow instala Java 17, prepara MARS 4.5 y exige todos los escenarios. Algunos resultados representativos son:
 
 \begin{longtable}{p{7cm}p{5cm}}
 \toprule
@@ -232,10 +239,10 @@ npm run check
 npm test
 npm run build
 npm run cli:mips
-npm audit --omit=dev
+npm audit
 \end{verbatim}
 
-TypeScript, pruebas y build terminan correctamente; la auditor\'ia de dependencias de producci\'on reporta cero vulnerabilidades.
+TypeScript, 186 pruebas locales y el build terminan correctamente; 35 escenarios MARS quedan condicionados a Java/MARS y son obligatorios en CI. La auditor\'ia completa de dependencias reporta cero vulnerabilidades.
 
 \chapter{Trazabilidad con el enunciado}
 
@@ -250,16 +257,16 @@ Resultados dentro de GUI & Cumple & paneles de fases, TAC y MIPS\\
 M\'ultiples errores y recuperaci\'on & Cumple & listeners, estrategia ANTLR y visitors\\
 No TAC/MIPS ante errores & Cumple & estados y pruebas negativas\\
 Mirilla & Cumple & optimizador y m\'etricas\\
-Ensamblador ejecutable & Cumple & quince ejecuciones MARS\\
+Ensamblador ejecutable & Cumple & 35 escenarios MARS exigidos en CI\\
 No c\'odigo objeto ni ejecuci\'on interna & Cumple & exportaci\'on a herramienta externa\\
 \bottomrule
 \end{longtable}
 
 \chapter{Limitaciones y trabajo futuro}
 
-Compiscript y el TAC actual no definen una instrucci\'on \codigo{throw} ni un ABI de excepciones; por ello los marcadores \codigo{TRY\_BEGIN}/\codigo{CATCH\_BEGIN} preservan estructura, pero no realizan unwinding de pila. Tampoco existe una fase global de optimizaci\'on, de acuerdo con el alcance: solo se aplica mirilla local.
+Compiscript no expone una sentencia \codigo{throw} de usuario; sin embargo, el backend utiliza \codigo{TRY\_BEGIN}, \codigo{TRY\_END} y \codigo{CATCH\_BEGIN} para registrar handlers din\'amicos. Los errores de arreglos restauran \codigo{\$sp}, \codigo{\$fp} y \codigo{\$s7}, incluso al atravesar una llamada, y transfieren el mensaje al bloque \codigo{catch}. No existe una fase global de optimizaci\'on, de acuerdo con el alcance: se aplica mirilla local.
 
-Como evoluci\'on podr\'ian incorporarse bounds checks con handlers, asignaci\'on global de registros por liveness y un runner de integraci\'on continua que descargue MARS bajo aceptaci\'on de su licencia. Estas mejoras no son necesarias para el alcance actual.
+Como evoluci\'on podr\'ian incorporarse una sentencia \codigo{throw} en el lenguaje, tipos de excepci\'on, asignaci\'on global de registros por liveness y optimizaciones entre bloques. Estas mejoras no son necesarias para el alcance actual.
 
 \chapter{Conclusiones}
 
@@ -270,7 +277,9 @@ La evidencia combina pruebas unitarias, integraci\'on, build de producci\'on y e
 \appendix
 \chapter{Mapa de archivos}
 
-\begin{longtable}{p{6cm}p{7cm}}
+\begingroup
+\renewcommand{\arraystretch}{1.22}
+\begin{longtable}{>{\raggedright\arraybackslash}p{7.2cm}p{5.8cm}}
 \toprule
 Archivo & Responsabilidad\\\midrule
 \endhead
@@ -285,5 +294,6 @@ Archivo & Responsabilidad\\\midrule
 \archivo{examples/mips} & demostraciones y caso de bloqueo\\
 \bottomrule
 \end{longtable}
+\endgroup
 
 \end{document}

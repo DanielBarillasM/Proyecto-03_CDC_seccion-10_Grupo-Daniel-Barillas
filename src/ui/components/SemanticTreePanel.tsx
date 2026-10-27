@@ -40,7 +40,7 @@ function SemanticNode({ node, depth }: { node: SemanticTreeNode; depth: number }
     >
       <Heading
         className={`rounded border-2 px-2 py-1 text-left text-xs focus-visible:outline-2 focus-visible:outline-primary ${hasChildren ? "cursor-pointer" : ""} ${
-          node.diagnostics.length > 0 ? "border-red-900 bg-red-200 text-red-900" : "border-transparent hover:border-border hover:bg-accent"
+          node.diagnostics.length > 0 ? "border-red-500/30 bg-red-400/10 text-red-700 dark:text-red-200" : "border-transparent hover:border-border hover:bg-accent"
         }`}
       >
         <span className="rounded border-2 bg-muted px-1.5 py-0.5">{node.kind}</span>
@@ -52,7 +52,7 @@ function SemanticNode({ node, depth }: { node: SemanticTreeNode; depth: number }
           </span>
         )}
         {node.diagnostics.map((code) => (
-          <span key={`${node.id}-${code}`} className="ml-1.5 rounded border-2 border-red-900 bg-red-300 px-1 text-red-900">
+          <span key={`${node.id}-${code}`} className="ml-1.5 rounded border border-red-500/30 bg-red-400/10 px-1 text-red-700 dark:text-red-200">
             {code}
           </span>
         ))}

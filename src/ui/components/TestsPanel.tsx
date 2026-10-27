@@ -183,7 +183,7 @@ function TestCaseRow({
   ) : outcome.passed ? (
     <CheckCircle2 size={18} className="shrink-0 text-green-700" />
   ) : (
-    <XCircle size={18} className="shrink-0 text-red-700" />
+    <XCircle size={18} className="shrink-0 text-red-700 dark:text-red-300" />
   );
 
   return (
@@ -214,7 +214,7 @@ function TestCaseRow({
         <div className="flex flex-col gap-2 border-t-2 p-2 pl-[38px]">
           <ExpectationSummary expectation={testCase.expectation} />
           {outcome && !outcome.passed && (
-            <ul className="list-disc pl-4 text-xs text-red-700">
+            <ul className="list-disc pl-4 text-xs text-red-700 dark:text-red-300">
               {outcome.notes.map((note) => (
                 <li key={note}>{note}</li>
               ))}
@@ -291,7 +291,7 @@ function TestCaseForm({ onCancel, onSubmit }: { onCancel: () => void; onSubmit: 
   return (
     <div className="flex flex-col gap-2 rounded border-2 border-primary bg-card p-3">
       <h4 className="font-head text-sm">Nueva prueba</h4>
-      {error && <p role="alert" className="text-xs text-red-700">{error}</p>}
+      {error && <p role="alert" className="text-xs text-red-700 dark:text-red-300">{error}</p>}
 
       <Input
         aria-label="Nombre de la prueba"

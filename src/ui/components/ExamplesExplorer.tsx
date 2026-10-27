@@ -83,7 +83,7 @@ export function ExamplesExplorer({ value, onChange }: ExamplesExplorerProps) {
           </li>
         ))}
       </ul>
-      {active && <p className="rounded-xl border border-white/5 bg-white/[0.02] px-2.5 py-2 text-[11px] leading-relaxed text-muted-foreground">{active.description}</p>}
+      {active && <p className="rounded-xl border border-border bg-background/40 px-2.5 py-2 text-[11px] leading-relaxed text-muted-foreground">{active.description}</p>}
     </div>
   );
 }

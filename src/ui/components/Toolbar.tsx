@@ -32,7 +32,7 @@ export function Toolbar({ isRunning, isEmpty, onAnalyze, onReset, result, theme,
         <Play size={14} />
         {isRunning ? "Analizando…" : "Ejecutar análisis"}
       </Button>
-      <span className="flex items-center gap-1.5 rounded-lg border border-white/5 bg-white/[0.025] px-2 py-1 text-[10px] text-muted-foreground">
+      <span className="flex items-center gap-1.5 rounded-lg border border-border bg-background/40 px-2 py-1 text-[10px] text-muted-foreground">
         <Command size={11} /> Ctrl + Enter
       </span>
 
@@ -45,7 +45,7 @@ export function Toolbar({ isRunning, isEmpty, onAnalyze, onReset, result, theme,
         <Tooltip>
           <TooltipTrigger asChild>
             <AlertDialogTrigger asChild>
-              <Button variant="ghost" size="icon-sm" className="rounded-lg text-muted-foreground hover:bg-white/5 hover:text-foreground" aria-label="Restablecer">
+              <Button variant="ghost" size="icon-sm" className="rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground" aria-label="Restablecer">
                 <RotateCcw size={15} />
               </Button>
             </AlertDialogTrigger>
@@ -71,7 +71,7 @@ export function Toolbar({ isRunning, isEmpty, onAnalyze, onReset, result, theme,
           <Button
             variant="ghost"
             size="icon-sm"
-            className="rounded-lg text-muted-foreground hover:bg-white/5 hover:text-foreground"
+            className="rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground"
             aria-label="Cambiar tema"
             onClick={() => onThemeChange(theme === "dark" ? "light" : "dark")}
           >

@@ -67,7 +67,7 @@ export function MenuBar({
   }
 
   return (
-    <div className="flex min-h-12 items-center gap-3 border-b border-white/5 px-3 py-1.5">
+    <div className="flex min-h-12 items-center gap-3 border-b border-border px-3 py-1.5">
       <div className="relative flex size-8 items-center justify-center rounded-xl border border-primary/35 bg-primary/15 text-primary shadow-[0_0_24px_rgba(139,124,255,0.24)]">
         <Cpu size={16} />
         <span className="absolute -right-0.5 -top-0.5 size-2 rounded-full border border-background bg-cyan-300 shadow-[0_0_10px_rgba(103,232,249,0.9)]" />
@@ -134,13 +134,13 @@ export function MenuBar({
 
       <div className="ml-auto hidden items-center gap-1.5 xl:flex">
         {capabilities.map((item) => (
-          <Badge key={item.label} variant="outline" className="border-white/8 bg-white/[0.025] text-[10px] text-muted-foreground shadow-none">
+          <Badge key={item.label} variant="outline" className="border-border bg-background/40 text-[10px] text-muted-foreground shadow-none">
             {item.icon}
             {item.label}
           </Badge>
         ))}
         <span className="mx-1 h-5 w-px bg-border" />
-        <span className="flex items-center gap-1.5 rounded-full border border-cyan-300/15 bg-cyan-300/5 px-2 py-1 text-[10px] font-medium text-cyan-300">
+        <span className="flex items-center gap-1.5 rounded-full border border-cyan-500/20 bg-cyan-400/10 px-2 py-1 text-[10px] font-medium text-cyan-700 dark:text-cyan-300">
           <Sparkles size={11} /> pipeline listo
         </span>
       </div>

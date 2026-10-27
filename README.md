@@ -13,7 +13,7 @@ Compilador visual de Compiscript que recorre el frontend completo, genera TAC y 
 [![Tests](https://img.shields.io/badge/tests-Vitest%20%2B%20MARS-32D583?style=for-the-badge&labelColor=111111)](#calidad-y-validación)
 [![License](https://img.shields.io/badge/license-MIT-FFD426?style=for-the-badge&labelColor=111111)](LICENSE)
 
-![Pipeline del Proyecto 3](docs/assets/compiscript-project3-pipeline.svg)
+![Pipeline del Proyecto 3](docs/assets/compiscript-project3-pipeline.png)
 
 **[Características](#características)** · **[Inicio rápido](#inicio-rápido)** · **[MARS](#ejecución-en-mars-45)** · **[Pruebas](#calidad-y-validación)** · **[Documentación](#documentación)**
 
@@ -65,7 +65,7 @@ El backend se encuentra en [`src/mips/generator.ts`](src/mips/generator.ts). Rec
 
 Las funciones reservan un frame alineado, guardan `$s7`, `$fp` y `$ra`, copian los parámetros a sus slots y restauran el estado en un epílogo único. Las llamadas anidadas consumen solo los argumentos superiores de la pila, por lo que expresiones como `f(1, g(2))` y llamadas a métodos son seguras.
 
-![Convención de pila](docs/assets/compiscript-project3-stack.svg)
+![Convención de pila](docs/assets/compiscript-project3-stack.png)
 
 ### Tipos y runtime
 
@@ -288,7 +288,7 @@ La validación real usa el MARS 4.5 oficial en modo CLI, no un emulador inventad
 │   ├── tac/               # Casos del Proyecto 2
 │   └── semantic/          # Casos del frontend
 ├── scripts/run-mars.mjs # Ejecución externa con MARS
-├── docs/                  # Arquitectura, matriz, auditoría e informes
+├── docs/                  # Arquitectura, matriz, auditoría e informe final
 ├── presentation/          # Presentación del Proyecto 3
 ├── electron/              # Aplicación de escritorio
 └── .github/workflows/     # Verificación y empaquetado
@@ -316,8 +316,6 @@ El workflow de GitHub ejecuta `check`, pruebas con MARS obligatorio, build, TAC 
 - [Informe técnico del Proyecto 3 (PDF)](docs/informe/INFORME_PROYECTO_03.pdf)
 - [Fuente LaTeX del informe](docs/informe/INFORME_PROYECTO_03.tex)
 - [Índice documental](docs/README.md)
-
-Los informes `INFORME_PROYECTO_01.*` e `INFORME_PROYECTO_02.*` se conservan como historial de las fases anteriores; no describen por sí solos el backend actual.
 
 ## Tecnologías
 

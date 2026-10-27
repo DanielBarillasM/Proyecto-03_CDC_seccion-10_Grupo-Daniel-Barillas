@@ -4,12 +4,12 @@ import type { AnalyzeResult } from "../../lib/types";
 type PhaseState = "ok" | "warning" | "error" | "skipped" | "not-run" | "idle";
 
 const STATE_STYLES: Record<PhaseState, string> = {
-  ok: "border-emerald-400/20 bg-emerald-400/8 text-emerald-300",
-  warning: "border-amber-400/20 bg-amber-400/8 text-amber-300",
-  error: "border-red-400/20 bg-red-400/8 text-red-300",
-  skipped: "border-white/6 bg-white/[0.025] text-muted-foreground",
-  "not-run": "border-white/6 bg-white/[0.025] text-muted-foreground",
-  idle: "border-white/6 bg-transparent text-muted-foreground"
+  ok: "border-emerald-500/25 bg-emerald-400/10 text-emerald-700 dark:text-emerald-300",
+  warning: "border-amber-500/25 bg-amber-400/10 text-amber-800 dark:text-amber-300",
+  error: "border-red-500/25 bg-red-400/10 text-red-700 dark:text-red-300",
+  skipped: "border-border bg-background/40 text-muted-foreground",
+  "not-run": "border-border bg-background/40 text-muted-foreground",
+  idle: "border-border bg-transparent text-muted-foreground"
 };
 
 export function PhasePipeline({ result }: { result: AnalyzeResult | null }) {

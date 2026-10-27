@@ -13,15 +13,15 @@ export function StatusBar({ isRunning, result, value, cursor }: StatusBarProps) 
   const isEmpty = value.trim().length === 0;
 
   const state = isRunning
-    ? { icon: <Loader2 size={12} className="animate-spin" />, label: "Analizando…", color: "text-cyan-300" }
+    ? { icon: <Loader2 size={12} className="animate-spin" />, label: "Analizando…", color: "text-cyan-700 dark:text-cyan-300" }
     : !result
       ? { icon: <CircleDashed size={12} />, label: "Esperando ejecución", color: "text-muted-foreground" }
       : result.accepted
-        ? { icon: <CheckCircle2 size={12} />, label: "Aceptado", color: "text-emerald-300" }
-        : { icon: <XCircle size={12} />, label: "Con diagnósticos", color: "text-red-300" };
+        ? { icon: <CheckCircle2 size={12} />, label: "Aceptado", color: "text-emerald-700 dark:text-emerald-300" }
+        : { icon: <XCircle size={12} />, label: "Con diagnósticos", color: "text-red-700 dark:text-red-300" };
 
   return (
-    <div className="flex h-8 items-center justify-between rounded-xl border border-white/5 bg-card/65 px-3 text-[10px] shadow-lg backdrop-blur-xl">
+    <div className="flex h-8 items-center justify-between rounded-xl border border-border bg-card/65 px-3 text-[10px] shadow-lg backdrop-blur-xl">
       <div className={`flex items-center gap-1.5 font-semibold ${state.color}`}>
         {state.icon}
         <span>{state.label}</span>

@@ -195,7 +195,7 @@ function MipsInspector({ result }: { result: AnalyzeResult }) {
 export function RightDock({ result, inputText, activeTab, onTabChange, onSelectScope, onLoadTestSource }: RightDockProps) {
   return (
     <Tabs orientation="vertical" value={activeTab} onValueChange={(next) => onTabChange(next as DockTabId)} className="flex h-full min-w-0 flex-row gap-0 bg-card/20">
-      <TabsList variant="line" className="h-full w-12 min-w-12 flex-none flex-col justify-start gap-1 overflow-y-auto rounded-none border-r border-white/5 bg-black/10 px-1.5 py-2">
+      <TabsList variant="line" className="h-full w-12 min-w-12 flex-none flex-col justify-start gap-1 overflow-y-auto rounded-none border-r border-border bg-background/35 px-1.5 py-2">
         <TabsTrigger value="resultado" className="size-9 flex-none rounded-xl p-0" aria-label="Resultado" title="Resultado">
           <ListChecks size={15} /> <span className="sr-only">Resultado</span>
         </TabsTrigger>

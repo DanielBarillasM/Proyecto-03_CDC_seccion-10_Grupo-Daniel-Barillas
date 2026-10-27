@@ -18,7 +18,7 @@ interface AboutDialogProps {
 export function AboutDialog({ open, onOpenChange }: AboutDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="border-white/10 bg-popover/90 shadow-2xl backdrop-blur-2xl sm:max-w-md">
+      <DialogContent className="border-border bg-popover/90 shadow-2xl backdrop-blur-2xl sm:max-w-md">
         <DialogHeader>
           <div className="flex items-center gap-1.5 text-xs font-head uppercase tracking-wide text-muted-foreground">
             <GraduationCap size={14} /> Construcción de Compiladores · Proyecto 3
@@ -51,7 +51,7 @@ export function AboutDialog({ open, onOpenChange }: AboutDialogProps) {
           </div>
         </div>
 
-        <div className="rounded-xl border border-white/8 bg-white/[0.025] p-3 text-sm">
+        <div className="rounded-xl border border-border bg-background/45 p-3 text-sm">
           <span className="surface-label">Autor</span>
           <strong className="mt-1 block">Pablo Daniel Barillas Moreno</strong>
           <span className="text-xs text-muted-foreground">Carné 22193 · Grupo Daniel-Barillas</span>

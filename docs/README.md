@@ -1,6 +1,6 @@
 # Documentación del Proyecto 3
 
-La documentación vigente describe el pipeline completo de Compiscript hasta MIPS32/MARS. Los materiales de Proyectos 1 y 2 se conservan como historial del frontend y de TAC, pero no sustituyen los documentos actuales.
+La documentación vigente describe el pipeline completo de Compiscript hasta MIPS32/MARS. El diseño TAC, las decisiones semánticas, los ejemplos y los recursos gráficos heredados se conservan porque forman parte de la implementación actual.
 
 | Documento | Contenido |
 | --- | --- |
@@ -14,14 +14,6 @@ La documentación vigente describe el pipeline completo de Compiscript hasta MIP
 | [`../presentation/compiscript-proyecto-3.html`](../presentation/compiscript-proyecto-3.html) | presentación navegable del Proyecto 3 |
 | [`informe/INFORME_PROYECTO_03.pdf`](informe/INFORME_PROYECTO_03.pdf) | informe técnico compilado del Proyecto 3 |
 | [`informe/INFORME_PROYECTO_03.tex`](informe/INFORME_PROYECTO_03.tex) | informe técnico actual en LaTeX |
-
-## Historial
-
-- `informe/INFORME_PROYECTO_01.*`: lexer, parser y semántica inicial;
-- `informe/INFORME_PROYECTO_02.*`: TAC, CFG, frames y layouts;
-- `ARQUITECTURA_PROYECTO_2.md` y `AUDITORIA_PROYECTO_2.md`: cierre del Proyecto 2.
-
-Estos archivos tienen valor histórico y sus cifras/versiones corresponden a sus entregas. La versión actual es 3.0.0 y su evidencia vigente está en la auditoría del Proyecto 3.
 
 ## Verificación reproducible
 

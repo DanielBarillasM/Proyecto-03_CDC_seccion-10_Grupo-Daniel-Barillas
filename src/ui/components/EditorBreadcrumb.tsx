@@ -9,7 +9,7 @@ interface EditorBreadcrumbProps {
 
 export function EditorBreadcrumb({ fileName, scopeChain, onClearScope }: EditorBreadcrumbProps) {
   return (
-    <div className="flex min-h-8 items-center gap-1 border-b border-white/5 bg-black/10 px-3 py-1 text-[10px] text-muted-foreground">
+    <div className="flex min-h-8 items-center gap-1 border-b border-border bg-background/35 px-3 py-1 text-[10px] text-muted-foreground">
       <FileCode2 size={13} />
       <span>{fileName}</span>
       {scopeChain?.map((scope) => (

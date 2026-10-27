@@ -53,7 +53,7 @@ export function CompilerGuide() {
 
       <ol className="relative flex flex-col gap-1 before:absolute before:bottom-4 before:left-[18px] before:top-4 before:w-px before:bg-gradient-to-b before:from-primary/60 before:to-cyan-300/15">
         {phases.map((phase) => (
-          <li key={phase.number} className="relative flex items-start gap-2.5 rounded-xl border border-transparent bg-transparent p-2 transition hover:border-border hover:bg-white/[0.025]">
+          <li key={phase.number} className="relative flex items-start gap-2.5 rounded-xl border border-transparent bg-transparent p-2 transition hover:border-border hover:bg-accent/55">
             <span className="z-10 flex size-5 shrink-0 items-center justify-center rounded-md border border-primary/20 bg-background font-mono text-[8px] text-primary">{phase.number}</span>
             <span className="mt-0.5 text-muted-foreground">{phase.icon}</span>
             <span className="min-w-0">

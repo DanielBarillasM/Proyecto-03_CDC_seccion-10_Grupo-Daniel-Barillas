@@ -205,7 +205,7 @@ export function App() {
           role="alert"
           initial={{ opacity: 0, height: 0 }}
           animate={{ opacity: 1, height: "auto" }}
-          className="relative z-20 mx-2 mt-2 rounded-xl border border-red-400/30 bg-red-500/10 px-3 py-2 text-xs text-red-200 shadow-lg backdrop-blur-xl"
+          className="relative z-20 mx-2 mt-2 rounded-xl border border-red-500/25 bg-red-500/10 px-3 py-2 text-xs text-red-700 shadow-lg backdrop-blur-xl dark:text-red-200"
         >
           {analyzeError ?? fileError}
         </motion.div>

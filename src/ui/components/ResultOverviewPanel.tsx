@@ -32,7 +32,7 @@ export function ResultOverviewPanel({ result }: { result: AnalyzeResult | null }
     <div className="flex flex-col gap-3 p-3.5">
       <div
         className={`flex items-start gap-3 rounded-2xl border p-3.5 ${
-          accepted ? "border-emerald-400/20 bg-emerald-400/8 text-emerald-200" : "border-red-400/20 bg-red-400/8 text-red-200"
+          accepted ? "border-emerald-500/20 bg-emerald-400/10 text-emerald-700 dark:text-emerald-200" : "border-red-500/20 bg-red-400/10 text-red-700 dark:text-red-200"
         }`}
       >
         {accepted ? <CheckCircle2 size={26} className="shrink-0" /> : <XCircle size={26} className="shrink-0" />}
@@ -81,7 +81,7 @@ export function ResultOverviewPanel({ result }: { result: AnalyzeResult | null }
         <OverviewMetric label="Closures" value={semantic.metrics.capturedVariableCount} detail="variables capturadas" />
       </div>
 
-      <div className="flex flex-col gap-2 rounded-2xl border bg-white/[0.025] p-3">
+      <div className="flex flex-col gap-2 rounded-2xl border bg-background/40 p-3">
         <div className="flex items-start gap-2">
           <CircleAlert size={16} className="mt-0.5 shrink-0" />
           <div>
@@ -138,7 +138,7 @@ function SummaryCard({
   return (
     <div
       className={`flex flex-col items-center gap-1 rounded-xl border p-2.5 text-center transition hover:-translate-y-0.5 ${
-        alert === undefined ? "border-white/5 bg-white/[0.025]" : alert ? "border-red-400/20 bg-red-400/8 text-red-200" : "border-emerald-400/20 bg-emerald-400/8 text-emerald-200"
+        alert === undefined ? "border-border bg-background/40" : alert ? "border-red-500/20 bg-red-400/10 text-red-700 dark:text-red-200" : "border-emerald-500/20 bg-emerald-400/10 text-emerald-700 dark:text-emerald-200"
       }`}
     >
       {icon}
@@ -150,7 +150,7 @@ function SummaryCard({
 
 function OverviewMetric({ label, value, detail }: { label: string; value: number; detail: string }) {
   return (
-    <div className="flex flex-col rounded-xl border border-white/5 bg-white/[0.025] p-2.5">
+    <div className="flex flex-col rounded-xl border border-border bg-background/40 p-2.5">
       <strong className="font-mono text-lg font-semibold leading-none text-primary">{value}</strong>
       <span className="text-xs">{label}</span>
       <small className="text-xs text-muted-foreground">{detail}</small>

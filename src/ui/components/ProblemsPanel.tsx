@@ -45,7 +45,7 @@ export function ProblemsPanel({ result, onRevealLine }: ProblemsPanelProps) {
 
   return (
     <div className="flex h-full flex-col bg-card/20">
-      <div className="flex min-h-10 items-center gap-2 border-b border-white/5 bg-black/10 px-3 py-1.5">
+      <div className="flex min-h-10 items-center gap-2 border-b border-border bg-background/35 px-3 py-1.5">
         <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
           <ListChecks size={14} /> {totalProblems} problemas
         </span>
@@ -59,7 +59,7 @@ export function ProblemsPanel({ result, onRevealLine }: ProblemsPanelProps) {
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Buscar código, símbolo o mensaje…"
               aria-label="Buscar problemas"
-              className="h-7 w-56 rounded-lg border-white/8 bg-white/[0.025] pl-7 text-xs shadow-none"
+              className="h-7 w-56 rounded-lg border-border bg-background/45 pl-7 text-xs shadow-none"
             />
           </div>
           <select className="native-select" aria-label="Filtrar por severidad" name="problems-severity" autoComplete="off" value={severity} onChange={(event) => setSeverity(event.target.value as SeverityFilter)}>
@@ -72,7 +72,7 @@ export function ProblemsPanel({ result, onRevealLine }: ProblemsPanelProps) {
 
       <div className="flex-1 overflow-auto p-2">
         {totalProblems === 0 ? (
-          <div className="flex items-center gap-2 rounded-xl border border-emerald-400/20 bg-emerald-400/8 p-3 text-sm text-emerald-200">
+          <div className="flex items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-400/10 p-3 text-sm text-emerald-700 dark:text-emerald-200">
             <CheckCircle2 size={18} />
             <span>Sin errores léxicos, sintácticos ni semánticos.</span>
           </div>
@@ -128,8 +128,8 @@ export function ProblemsPanel({ result, onRevealLine }: ProblemsPanelProps) {
                         key={`${diagnostic.code}-${diagnostic.tacIndex ?? index}`}
                         className={`flex flex-col gap-1 rounded-xl border p-2 text-xs ${
                           diagnostic.severity === "error"
-                            ? "border-red-400/20 bg-red-400/8 text-red-200"
-                            : "border-amber-400/20 bg-amber-400/8 text-amber-200"
+                            ? "border-red-500/20 bg-red-400/10 text-red-700 dark:text-red-200"
+                            : "border-amber-500/20 bg-amber-400/10 text-amber-800 dark:text-amber-200"
                         }`}
                       >
                         <div className="flex flex-wrap items-center gap-2">
@@ -193,7 +193,7 @@ function ErrorGroup({
             key={`${error.source}-${error.line}-${error.column}-${idx}`}
             type="button"
             onClick={() => onRevealLine(error.line)}
-            className="flex flex-col items-start gap-0.5 rounded-xl border border-red-400/20 bg-red-400/8 p-2 text-left text-xs text-red-200 transition hover:border-red-400/35 hover:bg-red-400/12"
+            className="flex flex-col items-start gap-0.5 rounded-xl border border-red-500/20 bg-red-400/10 p-2 text-left text-xs text-red-700 transition hover:border-red-500/35 hover:bg-red-400/15 dark:text-red-200"
           >
             <div className="flex items-center gap-2">
               <span className="rounded-md border border-red-400/25 bg-red-400/10 px-1.5 font-mono text-[10px]">{error.source === "lexer" ? "LEX" : "SYN"}</span>
@@ -217,7 +217,7 @@ function DiagnosticRow({ diagnostic, onRevealLine }: { diagnostic: SemanticDiagn
       type="button"
       onClick={() => onRevealLine(diagnostic.line)}
       className={`flex flex-col items-start gap-1 rounded-xl border p-2 text-left text-xs transition ${
-        isError ? "border-red-400/20 bg-red-400/8 text-red-200 hover:bg-red-400/12" : "border-amber-400/20 bg-amber-400/8 text-amber-200 hover:bg-amber-400/12"
+        isError ? "border-red-500/20 bg-red-400/10 text-red-700 hover:bg-red-400/15 dark:text-red-200" : "border-amber-500/20 bg-amber-400/10 text-amber-800 hover:bg-amber-400/15 dark:text-amber-200"
       }`}
     >
       <div className="flex flex-wrap items-center gap-2">

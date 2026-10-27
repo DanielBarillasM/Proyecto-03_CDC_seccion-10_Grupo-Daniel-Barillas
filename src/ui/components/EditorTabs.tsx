@@ -40,9 +40,9 @@ export function EditorTabs({
     <Tabs
       value={activeTab}
       onValueChange={(next) => onTabChange(next as EditorTabId)}
-      className="flex h-full flex-col gap-0 bg-[#080b14]/35"
+      className="flex h-full flex-col gap-0 bg-background/35"
     >
-      <TabsList variant="line" className="h-11 justify-start gap-1 rounded-none border-b border-white/5 bg-card/30 px-2.5 pt-1">
+      <TabsList variant="line" className="h-11 justify-start gap-1 rounded-none border-b border-border bg-card/30 px-2.5 pt-1">
         <TabsTrigger value="program" className="h-9 rounded-t-xl border border-transparent px-3 text-xs data-[state=active]:border-border data-[state=active]:border-b-transparent data-[state=active]:bg-background/70">
           <FileCode2 size={14} /> program.cps
         </TabsTrigger>
@@ -54,7 +54,7 @@ export function EditorTabs({
       <TabsContent value="program" className="flex min-h-0 flex-1 flex-col">
         <EditorBreadcrumb fileName="program.cps" scopeChain={scopeChain} onClearScope={onClearScope} />
         {isEmpty && (
-          <div className="border-b border-amber-300/20 bg-amber-300/8 px-3 py-2 text-xs text-amber-200">
+          <div className="border-b border-amber-500/20 bg-amber-400/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-200">
             La entrada está vacía. Selecciona un caso o carga un archivo Compiscript.
           </div>
         )}
