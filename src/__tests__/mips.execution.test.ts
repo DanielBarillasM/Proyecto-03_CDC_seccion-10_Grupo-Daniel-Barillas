@@ -58,7 +58,7 @@ const cases = [
   ["caught float division by zero", "try { print(1.0 / 0.0); } catch (err) { print(err); }", "Runtime error: division by zero"],
   ["explicit child constructor initializes parent", "class Base { let x: integer = 41; } class Child: Base { let y: integer = 1; function constructor() { this.y = 2; } } let c = new Child(); print(c.x); print(c.y);", "41\n2"],
   ["dynamic method dispatch", "class Base { function value(): integer { return 1; } } class Child: Base { function value(): integer { return 2; } } let item: Base = new Child(); print(item.value());", "2"],
-  ["uninitialized locals are deterministic", "function value(): integer { let x: integer; return x; } print(value());", "0"],
+  ["uninitialized locals and block shadowing are deterministic", "function value(): integer { let x: integer; return x; } print(value()); let x: integer = 1; { let x: integer = 2; print(x); } print(x);", "0\n2\n1"],
 ] as const;
 
 describe.skipIf(!existsSync(jar) || !javaAvailable)("MARS output regressions", () => {

@@ -307,6 +307,7 @@ El workflow de GitHub ejecuta `check`, pruebas con MARS obligatorio, build, TAC 
 
 ## Documentación
 
+- [Guía completa de pruebas y resultados esperados](docs/GUIA_PRUEBAS_COMPLETA.md)
 - [Arquitectura MIPS32 y convención de llamadas](docs/ARQUITECTURA_MIPS_PROYECTO_3.md)
 - [Matriz de requisitos](docs/MATRIZ_REQUISITOS.md)
 - [Auditoría del Proyecto 3](docs/AUDITORIA_PROYECTO_3.md)

@@ -131,7 +131,14 @@ class Generator {
   private findSlot(value: TacOperand): { frame: ActivationRecord; slot: FrameSlot } | undefined {
     const frame = value.frameId ? this.frames.get(value.frameId) : this.currentFrame;
     if (!frame) return undefined;
-    const slot = frame.slots.find((candidate) => (value.symbolId && candidate.symbolId === value.symbolId) || (value.kind === "temporary" && candidate.temporary === String(value.value)) || (candidate.name === String(value.value) && candidate.kind !== "temporary"));
+    // Un identificador resuelto debe buscarse exclusivamente por su identidad.
+    // Caer al nombre después de no encontrar el ID confunde símbolos homónimos
+    // de ámbitos anidados y hace que el shadowing sobrescriba el slot exterior.
+    const slot = frame.slots.find((candidate) => value.symbolId
+      ? candidate.symbolId === value.symbolId
+      : value.kind === "temporary"
+        ? candidate.temporary === String(value.value)
+        : candidate.name === String(value.value) && candidate.kind !== "temporary");
     return slot ? { frame, slot } : undefined;
   }
   private storage(value: TacOperand, create = false): string | undefined {

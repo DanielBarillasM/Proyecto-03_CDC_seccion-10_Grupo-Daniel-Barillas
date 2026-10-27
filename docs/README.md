@@ -5,6 +5,7 @@ La documentación vigente describe el pipeline completo de Compiscript hasta MIP
 | Documento | Contenido |
 | --- | --- |
 | [`../README.md`](../README.md) | instalación, uso, comandos, ejemplos y estado verificable |
+| [`GUIA_PRUEBAS_COMPLETA.md`](GUIA_PRUEBAS_COMPLETA.md) | casos de prueba, pasos de ejecución y resultados esperados |
 | [`ARQUITECTURA_MIPS_PROYECTO_3.md`](ARQUITECTURA_MIPS_PROYECTO_3.md) | ABI, frames, registros, memoria, runtime y mirilla |
 | [`MATRIZ_REQUISITOS.md`](MATRIZ_REQUISITOS.md) | trazabilidad del enunciado a código y pruebas |
 | [`AUDITORIA_PROYECTO_3.md`](AUDITORIA_PROYECTO_3.md) | hallazgos, correcciones y ejecuciones MARS |
