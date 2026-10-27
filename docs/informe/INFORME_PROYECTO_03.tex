@@ -1,0 +1,289 @@
+\documentclass[11pt,letterpaper,oneside]{report}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish,es-nodecimaldot]{babel}
+\usepackage{geometry}
+\usepackage{xcolor}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage[hidelinks]{hyperref}
+\usepackage{fancyhdr}
+\usepackage{enumitem}
+
+\geometry{margin=2.4cm}
+\definecolor{amarillo}{HTML}{FFD426}
+\definecolor{crema}{HTML}{FFF9EC}
+\definecolor{verde}{HTML}{32D583}
+\definecolor{negro}{HTML}{111111}
+\definecolor{gris}{HTML}{F2F2F2}
+\hypersetup{pdftitle={Compiscript MIPS Compiler IDE -- Proyecto 3},pdfauthor={Pablo Daniel Barillas Moreno}}
+\pagestyle{fancy}\fancyhf{}\fancyhead[L]{Compiscript MIPS Compiler IDE}\fancyhead[R]{Proyecto 3}\fancyfoot[C]{\thepage}
+\setlength{\headheight}{14pt}
+\setlist{itemsep=2pt,topsep=4pt}
+\newcommand{\codigo}[1]{\texttt{#1}}
+\newcommand{\archivo}[1]{\texttt{\detokenize{#1}}}
+
+\begin{document}
+
+\begin{titlepage}
+  \pagecolor{crema}\color{negro}
+  \centering
+  \vspace*{1.5cm}
+  {\Large Universidad del Valle de Guatemala\par}
+  \vspace{0.4cm}
+  {\large Construcci\'on de Compiladores -- Secci\'on 10\par}
+  \vspace{2cm}
+  \fcolorbox{negro}{amarillo}{\parbox[c][2.4cm][c]{11cm}{\centering\bfseries\fontsize{25}{28}\selectfont COMPISCRIPT\\MIPS COMPILER IDE}}
+  \vspace{1.4cm}
+
+  {\Huge\bfseries Informe t\'ecnico\par}
+  \vspace{0.3cm}
+  {\LARGE Proyecto 3: generaci\'on de c\'odigo ensamblador\par}
+  \vfill
+  \begin{tabular}{rl}
+    Grupo: & Daniel-Barillas\\
+    Integrante: & Pablo Daniel Barillas Moreno\\
+    Carn\'e: & 22193\\
+    Versi\'on: & 3.0.0\\
+    Fecha: & 20 de octubre de 2026
+  \end{tabular}
+  \vfill
+  {\large Compiscript $\rightarrow$ TAC $\rightarrow$ MIPS32 $\rightarrow$ MARS 4.5\par}
+\end{titlepage}
+\nopagecolor
+
+\tableofcontents
+
+\chapter{Resumen ejecutivo}
+
+El Proyecto 3 completa un compilador educativo para Compiscript. Conserva el lexer y parser generados con ANTLR4TS, el an\'alisis sem\'antico con tabla de s\'imbolos y la representaci\'on intermedia de tres direcciones de las entregas anteriores. Sobre esa base incorpora un backend que transforma exclusivamente TAC en ensamblador MIPS32 compatible con MARS 4.5.
+
+El producto se presenta como una interfaz gr\'afica React con editor Monaco. El usuario puede escribir o seleccionar un archivo \archivo{.cps}, ejecutar el pipeline, observar diagn\'osticos y examinar tokens, CST, \'arbol sem\'antico, s\'imbolos, \'ambitos, TAC, bloques b\'asicos, registros de activaci\'on y ensamblador. La exportaci\'on MIPS se habilita solamente cuando todas las fases terminan correctamente.
+
+El backend implementa convenci\'on de llamadas mediante pila, asignaci\'on local de registros, aritm\'etica entera y flotante, control de flujo, funciones, llamadas anidadas, recursi\'on, arreglos, objetos, m\'etodos, strings y closures. La salida fue ensamblada y ejecutada en el MARS 4.5 oficial con quince programas positivos.
+
+\chapter{Fundamentos te\'oricos}
+
+\section{Fases de compilaci\'on}
+
+Un compilador transforma un lenguaje fuente en una representaci\'on destino mediante fases con contratos definidos. En este proyecto, los tokens del lexer alimentan al parser; el CST v\'alido alimenta al visitor sem\'antico; el resultado tipado habilita TAC; finalmente, TAC habilita MIPS.
+
+\begin{figure}[ht]
+\centering
+\small
+\setlength{\fboxsep}{5pt}
+\colorbox{amarillo}{\textbf{Compiscript}} $\longrightarrow$
+\colorbox{amarillo}{\textbf{Lexer}} $\longrightarrow$
+\colorbox{amarillo}{\textbf{Parser}} $\longrightarrow$
+\colorbox{amarillo}{\textbf{Sem\'antica}} $\longrightarrow$
+\colorbox{amarillo}{\textbf{TAC}} $\longrightarrow$
+\colorbox{verde}{\textbf{MIPS32}}
+\caption{Pipeline completo de la versi\'on 3.0.0.}
+\end{figure}
+
+El principio de bloqueo evita que un error temprano se convierta en muchos errores derivados: lexer y parser contin\'uan recolectando diagn\'osticos, pero TAC y MIPS no se ejecutan si el programa no posee significado v\'alido.
+
+\section{C\'odigo de tres direcciones}
+
+TAC descompone expresiones complejas en instrucciones con a lo sumo dos operandos fuente y un resultado. Por ejemplo, \codigo{x = a + b * 4} se convierte en:
+
+\begin{verbatim}
+t0 = b * 4
+t1 = a + t0
+x = t1
+\end{verbatim}
+
+Esta forma simplifica la selecci\'on de instrucciones: cada cu\'adruplo tiene una traducci\'on local y los metadatos de tipo determinan si debe usarse la ALU entera o el coprocesador flotante.
+
+\section{Arquitectura MIPS32 y MARS}
+
+MIPS emplea un conjunto reducido de instrucciones y registros expl\'icitos. El proyecto usa registros temporales \codigo{\$t0--\$t9}, argumentos \codigo{\$a0--\$a1}, retornos \codigo{\$v0}/\codigo{\$f0}, stack pointer \codigo{\$sp}, frame pointer \codigo{\$fp}, return address \codigo{\$ra} y el registro \codigo{\$s7} como enlace al entorno de un closure.
+
+MARS 4.5 ensambla MIPS32 y ofrece syscalls educativas. Se emplean syscall 1 para enteros, 2 para flotantes, 4 para strings, 9 para memoria din\'amica y 10 para terminar el programa.
+
+\section{Registros de activaci\'on}
+
+Cada llamada necesita un frame independiente para soportar recursi\'on. El tama\~no proviene de \codigo{ActivationRecord.totalBytes} y se alinea a ocho bytes.
+
+\begin{figure}[ht]
+\centering
+\renewcommand{\arraystretch}{1.5}
+\begin{tabular}{|>{\centering\arraybackslash}p{9cm}|}\hline
+\colorbox{amarillo}{\parbox{8.5cm}{\centering\textbf{argumentos del llamador}}}\\\hline
+\codigo{\$ra} guardado\\\hline
+\codigo{\$fp} anterior\\\hline
+\codigo{\$s7} / entorno anterior\\\hline
+par\'ametros y variables locales\\\hline
+\colorbox{verde!35}{\parbox{8.5cm}{\centering\textbf{temporales TAC $\leftarrow$ \$fp = \$sp}}}\\\hline
+\end{tabular}
+\caption{Organizaci\'on conceptual del frame.}
+\end{figure}
+
+El llamador apila argumentos de izquierda a derecha. La funci\'on reserva el frame, guarda estado y copia par\'ametros a offsets estables. Una \codigo{CALL} consume solo sus propios argumentos, lo cual resuelve correctamente llamadas anidadas.
+
+\chapter{Dise\~no e implementaci\'on}
+
+\section{Contrato del backend}
+
+\archivo{src/mips/generator.ts} expone \codigo{generateMips(tac)}. El resultado usa estados expl\'icitos: \codigo{not-requested}, \codigo{skipped}, \codigo{completed} y \codigo{failed}. Un ensamblador parcial nunca se presenta como listo.
+
+\begin{longtable}{p{3cm}p{10cm}}
+\toprule
+Estado & Significado\\\midrule
+\endhead
+not-requested & la fase no fue solicitada\\
+skipped & no existe TAC v\'alido por errores anteriores\\
+completed & ensamblador generado y validado\\
+failed & el backend detect\'o una inconsistencia\\
+\bottomrule
+\end{longtable}
+
+\section{Resoluci\'on de almacenamiento}
+
+Los operandos globales se convierten en etiquetas del segmento \codigo{.data}. Los operandos de la funci\'on activa usan su offset relativo a \codigo{\$fp}. Las constantes se materializan con \codigo{li}, \codigo{la} o \codigo{l.s}. Los valores persistentes se almacenan despu\'es de cada cu\'adruplo; as\'i no dependen de que un registro temporal sobreviva a saltos o llamadas.
+
+\section{Asignador getReg}
+
+El asignador administra \codigo{\$t0} a \codigo{\$t7} y reinicia su conjunto de uso en cada instrucci\'on TAC. Esta decisi\'on corresponde a la naturaleza de tres direcciones: los valores vivos entre instrucciones est\'an en slots, mientras que los registros sirven para cargar operandos y producir un resultado local.
+
+\section{Selecci\'on de instrucciones}
+
+\begin{longtable}{p{3cm}p{4.5cm}p{5.5cm}}
+\toprule
+Familia TAC & MIPS & Observaci\'on\\\midrule
+\endhead
+MOV & li/la/lw y sw & depende de la clase del operando\\
+ADD/SUB/MUL & addu/subu/mul & enteros de 32 bits\\
+DIV/MOD & div con mflo/mfhi & cociente o residuo\\
+EQ--GE & seq, sne, slt, sle, sgt, sge & resultado booleano 0/1\\
+IF/GOTO & beq, bne, j & delay slot expl\'icito\\
+CALL & jal o jalr & nombre directo o puntero\\
+RETURN & \$v0/\$f0 & salta a un ep\'ilogo com\'un\\
+PRINT & syscall & seleccionado por tipo\\
+\bottomrule
+\end{longtable}
+
+\section{Datos compuestos}
+
+Los arreglos guardan longitud en el primer word y elementos desde el segundo. Los objetos reservan \codigo{ClassLayout.instanceSize}; los campos usan offsets calculados en TAC. Los m\'etodos se convierten en direcciones de etiqueta. Un closure reserva un puntero a funci\'on seguido de sus capturas y usa \codigo{\$s7} como entorno activo.
+
+\section{Strings y flotantes}
+
+Las cadenas constantes se internan para evitar duplicados. La concatenaci\'on solicita memoria y copia bytes; la igualdad compara byte a byte. Los flotantes usan instrucciones \codigo{l.s}, \codigo{s.s}, \codigo{add.s}, \codigo{sub.s}, \codigo{mul.s} y \codigo{div.s}. La promoci\'on entera se realiza con \codigo{mtc1} y \codigo{cvt.s.w}.
+
+\section{Mirilla}
+
+La optimizaci\'on local elimina movimientos de un registro hacia s\'i mismo, ajustes nulos de pila, saltos hacia la etiqueta siguiente y \codigo{nop} consecutivos. Se conserva la salida previa para auditor\'ia y se informa cu\'antas instrucciones se removieron.
+
+\chapter{Interfaz y experiencia de uso}
+
+El flujo normal para Entrada v\'alida y Archivo propio solicita modo \codigo{mips}; por tanto, un programa correcto llega autom\'aticamente al backend. El modo TAC permanece disponible como demostraci\'on aislada.
+
+El pipeline visual usa el estado real de cada fase. MIPS aparece como omitido ante errores previos, fallido ante diagn\'osticos del backend y listo para MARS solo en \codigo{completed}. El panel muestra estado, instrucciones finales, optimizaciones, diagn\'osticos, cantidad TAC y pico de registros.
+
+El selector de archivos est\'a dentro de la GUI y acepta \archivo{.cps}. Los resultados se muestran en la misma interfaz; la consola no es necesaria para la evaluaci\'on funcional.
+
+\chapter{CLI y ejecuci\'on externa}
+
+La CLI comparte \codigo{analyzeInput}; no posee un compilador alterno. El modo MIPS acepta \codigo{--out}:
+
+\begin{verbatim}
+npm run cli -- examples/mips/07_recursion.cps \
+  --mode mips --out factorial.asm
+java -jar Mars4_5.jar nc ae1 factorial.asm
+\end{verbatim}
+
+El script \archivo{scripts/run-mars.mjs} busca el JAR en el segundo argumento, en \codigo{MARS\_JAR} o en \archivo{tools/Mars4\_5.jar}. MARS sigue siendo una herramienta externa: el IDE genera y exporta, pero no simula internamente.
+
+\chapter{Pruebas y resultados}
+
+\section{Suite automatizada}
+
+La suite final contiene 221 casos en 15 archivos: 186 se ejecutan sin herramientas externas y 35 validan la salida real en MARS cuando Java y el JAR est\'an disponibles. Las pruebas del backend verifican generaci\'on completa, convenci\'on de pila, arreglos, runtime de strings, llamadas anidadas, closures, recuperaci\'on de \texttt{try/catch}, bloqueo por errores y mirilla. Las pruebas heredadas contin\'uan verificando lexer, parser, sem\'antica, s\'imbolos, TAC, CFG, UI y la exportaci\'on del modo MIPS.
+
+\section{Validaci\'on real en MARS}
+
+Se ejecutaron quince programas positivos en MARS 4.5. Algunos resultados representativos son:
+
+\begin{longtable}{p{7cm}p{5cm}}
+\toprule
+Caso & Salida\\\midrule
+aritm\'etica & 14\\
+funciones y pila & 42\\
+arreglos y foreach & 6\\
+strings y booleanos & Hola MIPS; true\\
+flotantes & 4.0\\
+factorial recursivo & 120\\
+closure & 1\\
+clase, m\'etodo y llamada anidada & 2; 6; 12\\
+\bottomrule
+\end{longtable}
+
+El caso de errores mezclados produce diagn\'osticos, deja TAC/MIPS en \codigo{skipped} y no crea un archivo ensamblador.
+
+\section{Comandos de verificaci\'on}
+
+\begin{verbatim}
+npm ci
+npm run check
+npm test
+npm run build
+npm run cli:mips
+npm audit --omit=dev
+\end{verbatim}
+
+TypeScript, pruebas y build terminan correctamente; la auditor\'ia de dependencias de producci\'on reporta cero vulnerabilidades.
+
+\chapter{Trazabilidad con el enunciado}
+
+\begin{longtable}{p{6cm}p{2.4cm}p{5cm}}
+\toprule
+Requisito & Estado & Evidencia\\\midrule
+\endhead
+ANTLR obligatorio & Cumple & gram\'atica y c\'odigo generado\\
+MIPS desde TAC & Cumple & API \codigo{generateMips(tac)}\\
+GUI y selector de archivo & Cumple & React/Monaco y men\'u Archivo\\
+Resultados dentro de GUI & Cumple & paneles de fases, TAC y MIPS\\
+M\'ultiples errores y recuperaci\'on & Cumple & listeners, estrategia ANTLR y visitors\\
+No TAC/MIPS ante errores & Cumple & estados y pruebas negativas\\
+Mirilla & Cumple & optimizador y m\'etricas\\
+Ensamblador ejecutable & Cumple & quince ejecuciones MARS\\
+No c\'odigo objeto ni ejecuci\'on interna & Cumple & exportaci\'on a herramienta externa\\
+\bottomrule
+\end{longtable}
+
+\chapter{Limitaciones y trabajo futuro}
+
+Compiscript y el TAC actual no definen una instrucci\'on \codigo{throw} ni un ABI de excepciones; por ello los marcadores \codigo{TRY\_BEGIN}/\codigo{CATCH\_BEGIN} preservan estructura, pero no realizan unwinding de pila. Tampoco existe una fase global de optimizaci\'on, de acuerdo con el alcance: solo se aplica mirilla local.
+
+Como evoluci\'on podr\'ian incorporarse bounds checks con handlers, asignaci\'on global de registros por liveness y un runner de integraci\'on continua que descargue MARS bajo aceptaci\'on de su licencia. Estas mejoras no son necesarias para el alcance actual.
+
+\chapter{Conclusiones}
+
+El Proyecto 3 integra de forma coherente las fases anteriores y produce ensamblador MIPS32 real desde TAC. La convenci\'on de llamadas permite funciones, anidamiento y recursi\'on; el modelo de heap cubre arreglos, objetos, cadenas y closures; los estados impiden exportar resultados inv\'alidos; y la interfaz hace observable todo el proceso.
+
+La evidencia combina pruebas unitarias, integraci\'on, build de producci\'on y ejecuci\'on en MARS 4.5. Por ello, la afirmaci\'on de compatibilidad no depende solamente de documentaci\'on o de ejemplos de ensamblador, sino de resultados reproducibles.
+
+\appendix
+\chapter{Mapa de archivos}
+
+\begin{longtable}{p{6cm}p{7cm}}
+\toprule
+Archivo & Responsabilidad\\\midrule
+\endhead
+\archivo{src/mips/generator.ts} & backend, runtime, mirilla y diagn\'osticos\\
+\archivo{src/tac/types.ts} & contrato de TAC, frames y layouts\\
+\archivo{src/lib/analyze.ts} & orquestaci\'on y bloqueo entre fases\\
+\archivo{src/ui/App.tsx} & flujo completo para entrada propia\\
+\archivo{src/ui/components/RightDock.tsx} & inspecci\'on y descarga MIPS\\
+\archivo{src/cli/run.ts} & modo MIPS y escritura \archivo{.asm}\\
+\archivo{scripts/run-mars.mjs} & invocaci\'on externa de MARS\\
+\archivo{src/__tests__/mips.test.ts} & regresiones del backend\\
+\archivo{examples/mips} & demostraciones y caso de bloqueo\\
+\bottomrule
+\end{longtable}
+
+\end{document}

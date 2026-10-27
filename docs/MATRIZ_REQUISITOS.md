@@ -1,0 +1,77 @@
+# Matriz de trazabilidad — Proyecto 3
+
+Esta matriz relaciona las instrucciones de generación de código ensamblador con implementación, evidencia automatizada y demostración externa.
+
+## Observaciones y restricciones
+
+| Requisito | Implementación | Evidencia | Estado |
+| --- | --- | --- | --- |
+| Fuente Compiscript | Gramática activa y extensión `.cps` | `src/grammars/Compiscript.g4`, `examples` | Cubierto |
+| Lexer/parser generados | ANTLR4TS genera lexer, parser y Visitor | `npm run generate`, `src/generated` | Cubierto |
+| Ensamblador generado desde TAC | `generateMips` solo acepta `TacGenerationResult` | `src/mips/generator.ts`, prueba MIPS | Cubierto |
+| Arquitectura destino definida | MIPS32 compatible con MARS 4.5 | arquitectura y campo `target` | Cubierto |
+| GUI amigable | Workbench React, Monaco, tema, paneles y estados | revisión de UI | Cubierto |
+| Archivo desde GUI | input restringido a `.cps` en menú Archivo | `MenuBar.tsx` | Cubierto |
+| Resultados dentro de GUI | lexer, parser, semántica, TAC, frames y MIPS | `RightDock`, `ProblemsPanel`, pipeline | Cubierto |
+| Casos propios | positivos, negativos y combinados | `examples/mips`, `examples/tac`, `examples/rubric` | Cubierto |
+| Continuar tras errores | acumulación por fase y recuperación ANTLR | suite léxica/sintáctica/semántica | Cubierto |
+| Evitar duplicados/ciclos/cascadas | normalización, deduplicación y fases bloqueadas | `analyze.ts`, tests | Cubierto |
+| No TAC/MIPS con errores previos | `skipped` y ensamblador vacío | prueba "bloquea TAC y MIPS" | Cubierto |
+| Optimización de mirilla | cuatro reglas locales conservadoras | `peepholeOptimize`, prueba unitaria | Cubierto |
+| Ensamblador válido | segmentos, etiquetas y opcodes MIPS32 | 15 ejecuciones MARS | Cubierto |
+| Ejecución con herramienta externa | runner Java configurable | `scripts/run-mars.mjs` | Cubierto |
+| No ejecución interna requerida | UI genera/exporta; MARS es externo | diseño y documentación | Cubierto |
+
+## Requisitos técnicos de generación
+
+| Capacidad | TAC / metadato | Traducción MIPS | Prueba |
+| --- | --- | --- | --- |
+| Declaraciones/asignaciones | `MOV`, slots | `li/lw/la` + `sw` | aritmética |
+| Aritmética entera | `ADD/SUB/MUL/DIV/MOD` | ALU, `div`, `mflo/mfhi` | MIPS unitario y MARS |
+| Aritmética float | tipos en operandos | coprocesador 1 | `06_flotantes.cps` |
+| Lógica/comparación | `NOT/AND/OR/EQ...` | pseudo-opcodes y branches | suite MIPS |
+| Control | labels, `GOTO`, `IF_*` | `j`, `beq`, `bne` | ciclos y condicionales |
+| Funciones | `FUNC_BEGIN/END`, `PARAM/CALL/RETURN` | frame, pila, `jal/jalr`, `$v0/$f0` | `02_funciones_y_pila.cps` |
+| Llamadas anidadas | cantidad en `CALL` | consumo parcial de argumentos | programa integral |
+| Recursión | label estable y frame | frame por invocación | factorial `120` |
+| Arreglos | `NEW_ARRAY`, acceso, longitud | syscall 9 y offsets | `03_control_y_arreglos.cps` |
+| Clases/objetos | `ClassLayout`, fields, methods | heap, offsets, punteros de función | clases e integral |
+| Closures | `MAKE_CLOSURE`, `CAPTURE`, load/store | entorno heap y `$s7` | `07_closure.cps` |
+| Strings | `ADD`, `EQ/NE`, constantes | `.asciiz`, concat y comparación | `04_cadenas_y_booleanos.cps` |
+| Impresión | `PRINT` tipado | syscalls 1, 2 y 4 | ejemplos MARS |
+| Registros | operandos TAC | `getReg` `$t0`–`$t7` | estadísticas y tests |
+| Mirilla | ensamblador preliminar | elimina redundancias locales | prueba `peepholeOptimize` |
+
+## Tabla de símbolos y fases heredadas
+
+| Área | Evidencia | Estado |
+| --- | --- | --- |
+| Insertar símbolos | `ScopeManager.declare` | Cubierto |
+| Recuperar información | `resolveCurrent`, `resolve` | Cubierto |
+| Actualizar información | `updateSymbol`, marcas de inicialización/captura | Cubierto |
+| Manejar alcances | árbol de scopes, enter/exit, shadowing | Cubierto |
+| Tipos y asignabilidad | `semanticTypes.ts`, `typeSystem.ts` | Cubierto |
+| Funciones, clases y arreglos | visitors y diagnósticos `SEM*` | Cubierto |
+| TAC tipado | `src/tac/types.ts`, `generator.ts` | Cubierto |
+| CFG y frames | `controlFlow.ts`, `ActivationRecord` | Cubierto |
+
+## Evidencia de calidad
+
+| Control | Resultado verificado |
+| --- | --- |
+| `npm run check` | aprobado |
+| `npm test` | 186 aprobadas; 35 MARS omitidas localmente sin Java |
+| `npm run build` | aprobado |
+| dependencias completas | 0 vulnerabilidades en `npm audit` |
+| MARS 4.5 | 35 casos definidos; CI los exige con Java 17 |
+| errores previos | TAC/MIPS omitidos |
+| backend inconsistente | estado `failed`, descarga deshabilitada |
+
+## Comprobaciones manuales externas
+
+- autorización docente para la modalidad individual del grupo Daniel-Barillas;
+- distribución de contribuciones en el historial Git;
+- publicación de release y firma de binarios;
+- evaluación estética subjetiva de la interfaz.
+
+Estas condiciones no pueden probarse únicamente desde el código, pero el repositorio deja la evidencia necesaria para revisarlas.

@@ -1,0 +1,184 @@
+import { displayType } from "../semantic/semanticTypes";
+import type { AnalyzeResult, TokenInfo } from "./types";
+import type { TacInstruction } from "../tac/types";
+
+/** Dispara la descarga de un archivo de texto desde el navegador. */
+export function downloadText(filename: string, content: string, mimeType = "text/plain;charset=utf-8"): void {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  URL.revokeObjectURL(url);
+}
+
+/** Serializa todas las fases que realmente fueron ejecutadas. */
+export function resultToJson(result: AnalyzeResult): string {
+  const payload = {
+    ...result,
+    generatedBy: "ANTLR 4 + antlr4ts + visitors semánticos + TAC + backend MIPS32 TypeScript",
+    project: "Proyecto 3: Compiscript MIPS Compiler IDE"
+  };
+  return JSON.stringify(payload, null, 2);
+}
+
+/** Convierte la lista de tokens en CSV. */
+export function tokensToCsv(tokens: TokenInfo[]): string {
+  const header = "index,type,typeName,text,line,column,channel";
+  const rows = tokens.map((t) =>
+    [
+      t.index,
+      t.type,
+      t.typeName,
+      `"${t.text.replace(/"/g, '""')}"`,
+      t.line,
+      t.column,
+      t.channel
+    ].join(",")
+  );
+  return [header, ...rows].join("\n");
+}
+
+/** Devuelve el árbol de parseo en formato texto indentado. */
+export function parseTreeToText(result: AnalyzeResult): string {
+  const lines: string[] = [
+    "=== ÁRBOL DE PARSEO ===",
+    `Lenguaje: ${result.language}`,
+    `Resultado: ${result.accepted ? "ACCEPTED" : "REJECTED"}`,
+    "",
+    result.formattedParseTree || "(árbol vacío)"
+  ];
+  return lines.join("\n");
+}
+
+/** Exporta instrucciones TAC en CSV para trazabilidad y análisis externo. */
+export function tacToCsv(instructions: TacInstruction[]): string {
+  const escape = (value: string | number | undefined) => `"${String(value ?? "").replace(/"/g, '""')}"`;
+  const operand = (item: TacInstruction["arg1"]) => item ? `${item.kind}:${String(item.value)}` : "";
+  const rows = instructions.map((instruction) => [
+    instruction.index,
+    instruction.op,
+    operand(instruction.arg1),
+    operand(instruction.arg2),
+    operand(instruction.result),
+    instruction.scopeId,
+    instruction.frameId ?? "",
+    instruction.source?.line ?? "",
+    instruction.source?.column ?? ""
+  ].map((value) => typeof value === "number" ? value : escape(value)).join(","));
+  return ["index,op,arg1,arg2,result,scopeId,frameId,line,column", ...rows].join("\n");
+}
+
+/** Exporta una vista humana de TAC y sus marcos de activación. */
+export function tacReportToText(result: AnalyzeResult): string {
+  const tac = result.tac;
+  return [
+    "=== CÓDIGO DE TRES DIRECCIONES ===",
+    `Estado: ${tac.status}`,
+    `Instrucciones: ${tac.metrics.instructionCount}`,
+    `Temporales: ${tac.metrics.temporaryCount}`,
+    `Temporales reutilizados: ${tac.metrics.temporariesReuseCount}`,
+    `Pico de temporales vivos: ${tac.metrics.peakLiveTemporaries}`,
+    `Etiquetas: ${tac.metrics.labelCount}`,
+    `Bloques básicos: ${tac.basicBlocks.length}`,
+    `Aristas de flujo: ${tac.controlFlowEdges.length}`,
+    `Marcos de activación: ${tac.metrics.activationRecordCount}`,
+    "",
+    tac.formattedCode || "(sin instrucciones)",
+    "",
+    "=== MARCOS ===",
+    ...tac.activationRecords.flatMap((frame) => [
+      `${frame.id} | ${frame.name} | kind=${frame.kind} | parent=${frame.parentFrameId ?? "—"} | slots=${frame.slots.length} | bytes=${frame.totalBytes}`,
+      ...frame.slots.map((slot) => `  - ${slot.name} | ${slot.kind} | offset=${slot.offset} | size=${slot.size}`)
+    ]),
+    "",
+    "=== LAYOUTS DE CLASES ===",
+    ...tac.classLayouts.flatMap((layout) => [
+      `${layout.name} | parent=${layout.parentClassId ?? "—"} | bytes=${layout.instanceSize}`,
+      ...layout.fields.map((field) => `  - ${field.name} | offset=${field.offset} | size=${field.size}`)
+    ])
+  ].join("\n");
+}
+
+/** Exporta una vista humana de diagnósticos, símbolos, ámbitos y métricas. */
+export function semanticReportToText(result: AnalyzeResult): string {
+  const semantic = result.semantic;
+  const lines: string[] = [
+    "=== REPORTE SEMÁNTICO DE COMPISCRIPT ===",
+    `Estado: ${semantic.status}`,
+    `Resultado final: ${result.accepted ? "ACEPTADO" : "RECHAZADO"}`,
+    "",
+    "MÉTRICAS",
+    `- Errores semánticos: ${semantic.errors.length}`,
+    `- Advertencias: ${semantic.warnings.length}`,
+    `- Símbolos: ${semantic.metrics.symbolCount}`,
+    `- Ámbitos: ${semantic.metrics.scopeCount}`,
+    `- Referencias resueltas: ${semantic.metrics.referenceCount}`,
+    `- Variables capturadas: ${semantic.metrics.capturedVariableCount}`,
+    ""
+  ];
+
+  if (semantic.status === "skipped") {
+    lines.push(`Fase omitida: ${semantic.skipReason ?? "errores en fases previas"}`);
+    return lines.join("\n");
+  }
+
+  lines.push("DIAGNÓSTICOS");
+  if (semantic.diagnostics.length === 0) {
+    lines.push("- Sin diagnósticos semánticos.");
+  } else {
+    for (const diagnostic of semantic.diagnostics) {
+      lines.push(
+        `- [${diagnostic.severity.toUpperCase()}] ${diagnostic.code} L${diagnostic.line}:C${diagnostic.column}: ${diagnostic.message}`
+      );
+      if (diagnostic.hint) lines.push(`  Sugerencia: ${diagnostic.hint}`);
+    }
+  }
+
+  lines.push("", "TABLA DE SÍMBOLOS");
+  if (semantic.symbols.length === 0) {
+    lines.push("- Sin símbolos.");
+  } else {
+    for (const symbol of semantic.symbols) {
+      lines.push(
+        `- ${symbol.name} | ${symbol.kind} | ${displayType(symbol.type)} | scope=${symbol.scopeId} | refs=${symbol.references.length}${symbol.captured ? " | closure" : ""}`
+      );
+    }
+  }
+
+  lines.push("", "ÁMBITOS");
+  for (const scope of semantic.scopes) {
+    lines.push(
+      `- ${scope.id} | ${scope.kind} | ${scope.name} | parent=${scope.parentId ?? "—"} | symbols=${scope.symbolIds.length}`
+    );
+  }
+
+  return lines.join("\n");
+}
+
+/** Tabla de símbolos en CSV para revisión o anexos. */
+export function symbolsToCsv(result: AnalyzeResult): string {
+  const scopeNameById = new Map(result.semantic.scopes.map((scope) => [scope.id, scope.name]));
+  const escape = (value: string | number | boolean) => `"${String(value).replace(/"/g, '""')}"`;
+  const rows = result.semantic.symbols.map((symbol) => [
+    escape(symbol.id),
+    escape(symbol.name),
+    escape(symbol.kind),
+    escape(displayType(symbol.type)),
+    escape(scopeNameById.get(symbol.scopeId) ?? symbol.scopeId),
+    escape(symbol.mutable),
+    escape(symbol.initialized),
+    escape(symbol.captured ?? false),
+    escape(symbol.references.length),
+    escape(symbol.declaration.line),
+    escape(symbol.declaration.column)
+  ].join(","));
+
+  return [
+    "id,name,kind,type,scope,mutable,initialized,captured,references,line,column",
+    ...rows
+  ].join("\n");
+}

@@ -1,18 +1,36 @@
-# Build and Release Folders
-bin-debug/
-bin-release/
-[Oo]bj/
-[Bb]in/
+# v0 sandbox internal files
+__v0_runtime_loader.js
+__v0_devtools.tsx
+__v0_jsx-dev-runtime.ts
+.snowflake/
+.design-cache/
+.v0-trash/
+.vercel/
 
-# Other files and folders
-.settings/
+# Environment variables
+.env*.local
 
-# Executables
-*.swf
-*.air
-*.ipa
-*.apk
+# Common ignores
+node_modules
+.npm-cache/
+.task-npm-cache/
+tools/*.jar
+.mars-test-*/
+dist/
+release/
+.playwright-cli/
+*.log
+*.aux
+*.fdb_latexmk
+*.fls
+*.out
+*.toc
+*.synctex.gz
+.next/
+.DS_Store
 
-# Project files, i.e. `.project`, `.actionScriptProperties` and `.flexProperties`
-# should NOT be excluded as they contain compiler settings and other important
-# information for Eclipse / Flash Builder.
+# Recursos heredados de V0 que no utiliza la aplicación
+public/placeholder*
+public/apple-icon.png
+public/icon-dark-32x32.png
+public/icon-light-32x32.png

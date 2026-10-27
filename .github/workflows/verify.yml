@@ -1,0 +1,33 @@
+name: Verify compiler
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - run: npm ci
+      - run: npm run mars:setup
+      - run: npm run check
+      - run: npm test
+        env:
+          REQUIRE_MARS: "1"
+      - run: npm run build
+      - run: npm run cli:tac
+      - run: npm run cli:mips
