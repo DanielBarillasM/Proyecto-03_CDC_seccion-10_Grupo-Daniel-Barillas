@@ -11,7 +11,7 @@ __v0_jsx-dev-runtime.ts
 .env*.local
 
 # Common ignores
-node_modules
+node_modules/
 .npm-cache/
 .task-npm-cache/
 tools/*.jar
