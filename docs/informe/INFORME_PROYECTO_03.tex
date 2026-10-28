@@ -29,8 +29,13 @@
 \renewcommand{\footrulewidth}{0.4pt}\renewcommand{\footrule}{\hbox to\headwidth{\color{borde}\leaders\hrule height \footrulewidth\hfill}}
 \setlength{\headheight}{24pt}
 \setlist{itemsep=2pt,topsep=4pt}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.48em}
+\raggedbottom
 \newcommand{\codigo}[1]{\texttt{#1}}
 \newcommand{\archivo}[1]{\path{#1}}
+\newcommand{\concepto}[1]{\textcolor{violetaoscuro}{\textbf{#1}}}
+\newenvironment{destacado}{\begin{center}\begin{minipage}{0.93\textwidth}\color{tinta}\setlength{\parskip}{0.35em}}{\end{minipage}\end{center}}
 \makeatletter
 \renewcommand{\@makechapterhead}[1]{\vspace*{-12pt}{\color{violeta}\rule{1.1cm}{4pt}}\par\vspace{12pt}{\Large\color{muted}\sffamily\bfseries CAPÍTULO \thechapter}\par\vspace{5pt}{\Huge\color{tinta}\sffamily\bfseries #1}\par\vspace{12pt}{\color{borde}\hrule}\vspace{24pt}}
 \renewcommand{\@makeschapterhead}[1]{\vspace*{-12pt}{\color{violeta}\rule{1.1cm}{4pt}}\par\vspace{12pt}{\Huge\color{tinta}\sffamily\bfseries #1}\par\vspace{12pt}{\color{borde}\hrule}\vspace{24pt}}
@@ -61,7 +66,7 @@
     Integrante: & Pablo Daniel Barillas Moreno\\
     Carn\'e: & 22193\\
     Versi\'on: & 3.0.0\\
-    Fecha: & 27 de octubre de 2026
+    Fecha: & 28 de octubre de 2026
   \end{tabular}
   \vfill
   {\color{violetaoscuro}\large\bfseries Compiscript $\rightarrow$ TAC $\rightarrow$ MIPS32 $\rightarrow$ MARS 4.5\par}
@@ -83,6 +88,81 @@ El producto se presenta como una interfaz gr\'afica React con editor Monaco. El 
 
 El backend implementa convenci\'on de llamadas mediante pila, asignaci\'on local de registros, aritm\'etica entera y flotante, control de flujo, funciones, llamadas anidadas, recursi\'on, arreglos, objetos, m\'etodos con despacho din\'amico, strings, closures y recuperaci\'on de errores de ejecuci\'on mediante \codigo{try/catch}. La suite define 41 casos de ejecuci\'on MARS y el workflow los exige con Java 17.
 
+El resultado no es solamente un traductor de ejemplos aislados. Es un pipeline verificable con contratos entre fases, bloqueo seguro ante entradas inv\'alidas, diagn\'osticos acumulativos y evidencia reproducible. La versi\'on documentada contiene 232 pruebas automatizadas en 15 archivos: 191 verificaciones que no requieren herramientas externas y 41 ejecuciones reales del ensamblador generado en MARS 4.5. El informe explica las decisiones que permiten sostener esa compatibilidad, los riesgos que se corrigieron y la relaci\'on entre cada requisito y su evidencia.
+
+\begin{destacado}
+\textbf{Resultado principal.} Un archivo Compiscript v\'alido puede seleccionarse en la interfaz, recorrer lexer, parser, sem\'antica y TAC, producir MIPS32, descargarse como \archivo{.asm} y ejecutarse externamente en MARS. Si aparece un error l\'exico, sint\'actico o sem\'antico, las fases TAC y MIPS quedan omitidas y no se habilita una exportaci\'on potencialmente incorrecta.
+\end{destacado}
+
+\chapter{Objetivos, alcance y criterios de aceptaci\'on}
+
+\section{Problema que resuelve el proyecto}
+
+El punto de partida es un lenguaje de alto nivel con variables, tipos, estructuras de control, funciones, arreglos, clases, herencia y funciones anidadas. La m\'aquina destino, en cambio, opera con registros, palabras de memoria, saltos y direcciones. El reto del Proyecto 3 consiste en cerrar esa diferencia sin perder el significado validado en las fases anteriores.
+
+La transformaci\'on debe conservar cuatro propiedades. Primero, cada identificador debe referirse al s\'imbolo correcto, incluso con \emph{shadowing}. Segundo, cada llamada debe preservar el estado del llamador y permitir recursi\'on. Tercero, los datos din\'amicos deben tener una representaci\'on concreta y segura en heap. Cuarto, la salida debe ser aceptada por una herramienta externa real, no solamente parecer ensamblador.
+
+\section{Objetivo general}
+
+Dise\~nar e implementar un backend que reciba exclusivamente la representaci\'on de tres direcciones de Compiscript y genere ensamblador MIPS32 ejecutable en MARS 4.5, integrado a una interfaz gr\'afica que permita observar y exportar los resultados del proceso de compilaci\'on.
+
+\section{Objetivos espec\'ificos}
+
+\begin{enumerate}
+  \item Reutilizar el lexer y parser generados con ANTLR4TS, el analizador sem\'antico y el TAC, sin introducir un segundo frontend incompatible.
+  \item Definir una convenci\'on de llamadas que soporte par\'ametros, retornos, llamadas anidadas, m\'etodos y recursi\'on.
+  \item Traducir tipos primitivos y compuestos a una representaci\'on uniforme de palabras de 32 bits y bloques de heap.
+  \item Implementar comprobaciones de runtime para accesos de arreglo, referencias nulas y divisiones entre cero.
+  \item Aplicar optimizaciones de mirilla conservadoras y medir su efecto sin alterar la sem\'antica.
+  \item Exponer diagn\'osticos, TAC, frames y ensamblador dentro de una GUI, con selecci\'on de archivos y descarga controlada.
+  \item Demostrar el resultado con pruebas unitarias, pruebas de integraci\'on, ejecuciones MARS y un workflow reproducible.
+\end{enumerate}
+
+\section{Alcance funcional}
+
+La entrega incluye el flujo completo desde texto fuente hasta un archivo ensamblador. El lenguaje cubierto contiene declaraciones \codigo{let}/\codigo{const}, expresiones, booleanos, enteros, flotantes, strings, arreglos multidimensionales, condicionales, ciclos, \codigo{switch}, funciones, recursi\'on, closures, clases, constructores, herencia, sobrescritura y \codigo{try/catch}. El backend genera segmentos \codigo{.data} y \codigo{.text}, runtime auxiliar y metadatos de validaci\'on.
+
+Quedan fuera del alcance la generaci\'on de c\'odigo objeto, el enlazado nativo, un recolector de basura y una fase global de optimizaci\'on. La ejecuci\'on del MIPS tampoco ocurre dentro de la GUI: el producto genera y exporta, mientras MARS ensambla y ejecuta como herramienta externa. Esta separaci\'on coincide con el enunciado y mantiene claro el l\'imite de responsabilidad del compilador.
+
+\section{Restricciones obligatorias y respuesta de dise\~no}
+
+\begin{longtable}{p{5.1cm}p{8.1cm}}
+\toprule
+Restricci\'on & Respuesta implementada\\\midrule
+\endhead
+Generador obligatorio de analizadores & ANTLR4TS genera lexer, parser y Visitor desde \archivo{Compiscript.g4}; no se sustituy\'o por un parser manual.\\
+Ensamblador obligatorio desde TAC & La API del backend recibe \codigo{TacGenerationResult}; no consulta el CST para reconstruir el programa.\\
+Interfaz gr\'afica & Workbench React con Monaco, explorador, pipeline, problemas, inspectores y temas claro/oscuro.\\
+Selecci\'on de archivo en GUI & El men\'u Archivo permite cargar entradas \archivo{.cps} sin depender de la consola.\\
+Resultados visibles en GUI & Tokens, \`arboles, s\'imbolos, \`ambitos, TAC, frames, MIPS y m\'etricas aparecen en paneles internos.\\
+Recuperaci\'on de errores & Listeners, estrategia de ANTLR, normalizaci\'on y deduplicaci\'on permiten reportar varios problemas por ejecuci\'on.\\
+No generar tras errores & Un error previo establece TAC/MIPS en \codigo{skipped}; la descarga se habilita solo para \codigo{completed}.\\
+Optimizaci\'on de mirilla & Cuatro reglas locales eliminan instrucciones redundantes y reportan conteos antes/despu\'es.\\
+Ejecuci\'on externa & El \archivo{.asm} se valida con MARS 4.5 mediante Java y el runner incluido.\\
+\bottomrule
+\end{longtable}
+
+\section{Criterios de aceptaci\'on}
+
+Se considera que una compilaci\'on v\'alida concluye correctamente cuando no hay errores, TAC y MIPS terminan en \codigo{completed}, el ensamblador contiene entrada, datos y etiquetas resueltas, y MARS produce la salida esperada. Una compilaci\'on inv\'alida es correcta cuando acumula diagn\'osticos \`utiles, no cae en un ciclo de recuperaci\'on, omite TAC/MIPS y deshabilita la exportaci\'on. Estos dos caminos se prueban expl\'icitamente; no se interpreta la ausencia de una excepci\'on de JavaScript como evidencia suficiente.
+
+\section{Tecnolog\'ias empleadas}
+
+\begin{longtable}{p{3.1cm}p{4.1cm}p{6cm}}
+\toprule
+Capa & Tecnolog\'ia & Prop\'osito\\\midrule
+\endhead
+Frontend & ANTLR4TS & Generaci\'on de lexer, parser y Visitor\\
+Implementaci\'on & TypeScript & Tipado de contratos, sem\'antica, TAC y backend\\
+Interfaz & React 19, Monaco, Tailwind CSS, Motion, Radix UI & Experiencia de IDE, paneles y componentes accesibles\\
+Construcci\'on & Vite 6 & Desarrollo y empaquetado web\\
+Pruebas & Vitest 5 & Pruebas unitarias, de regresi\'on e integraci\'on\\
+Destino & MIPS32 / MARS 4.5 & Ensamblado y ejecuci\'on externa verificable\\
+Escritorio & Electron & Distribuci\'on opcional para Windows, macOS y Linux\\
+Automatizaci\'on & GitHub Actions & Verificaci\'on con Java, MARS, build y empaquetado\\
+\bottomrule
+\end{longtable}
+
 \chapter{Fundamentos te\'oricos}
 
 \section{Fases de compilaci\'on}
@@ -97,6 +177,35 @@ Un compilador transforma un lenguaje fuente en una representaci\'on destino medi
 
 El principio de bloqueo evita que un error temprano se convierta en muchos errores derivados: lexer y parser contin\'uan recolectando diagn\'osticos, pero TAC y MIPS no se ejecutan si el programa no posee significado v\'alido.
 
+\section{An\'alisis l\'exico y sint\'actico}
+
+El lexer convierte caracteres en tokens: identificadores, literales, operadores, palabras reservadas y delimitadores. Los caracteres inv\'alidos no detienen inmediatamente el proceso; se registran con l\'inea y columna y el flujo contin\'ua. Para evitar ruido, caracteres inv\'alidos contiguos y errores derivados se normalizan antes de mostrarse.
+
+El parser consume esos tokens y construye un \emph{concrete syntax tree} (CST) conforme a la gram\'atica. La estrategia de recuperaci\'on intenta sincronizarse en puntos seguros, como cierres de instrucci\'on o bloque, para alcanzar declaraciones posteriores. Los mensajes internos de ANTLR se traducen a descripciones orientadas al usuario. Adem\'as, un l\'imite estructural de 256 niveles rechaza entradas patol\'ogicamente anidadas antes de que la pila de JavaScript se agote.
+
+La recuperaci\'on tiene una consecuencia importante: permite informar varios problemas en una sola ejecuci\'on, pero no autoriza a continuar con fases que asumir\'ian un \`arbol correcto. Por eso el CST puede mostrarse para diagn\'ostico, mientras la sem\'antica, TAC y MIPS respetan el estado de las fases anteriores.
+
+\section{An\'alisis sem\'antico}
+
+La sintaxis confirma que una construcci\'on tiene forma v\'alida; la sem\'antica determina si tiene significado. Un programa puede estar bien formado y aun as\'i intentar sumar una funci\'on, usar una variable no declarada, llamar un constructor con argumentos incompatibles o retornar un valor del tipo equivocado.
+
+El analizador mantiene una jerarqu\'ia de \`ambitos: global, clase, funci\'on, bloque, ciclo, \codigo{switch} y \codigo{catch}. Cada entrada de la tabla de s\'imbolos posee un identificador estable, tipo, mutabilidad, ubicaci\'on y almacenamiento. Buscar por identidad, y no solamente por nombre, es esencial para distinguir dos variables llamadas igual en bloques anidados.
+
+\begin{longtable}{p{3.2cm}p{4.1cm}p{5.9cm}}
+\toprule
+Categor\'ia & Ejemplos & Regla principal\\\midrule
+\endhead
+Primitivos & integer, float, boolean, string, null & operaciones y conversiones seg\'un tipo\\
+Arreglos & \codigo{T[]}, matrices anidadas & elementos homog\'eneos y asignabilidad invariante\\
+Instancias & clases y subclases & una instancia hija es asignable a una referencia base\\
+Funciones & par\'ametros y retorno & aridad y tipos compatibles\\
+Control & if, ciclos, switch, return & condiciones booleanas y contexto v\'alido\\
+Miembros & this, campos y m\'etodos & resoluci\'on en la clase y su cadena de herencia\\
+\bottomrule
+\end{longtable}
+
+La promoci\'on impl\'icita admitida es \codigo{integer} hacia \codigo{float}. Los arreglos mutables son invariantes: aunque \codigo{Perro} sea subtipo de \codigo{Animal}, \codigo{Perro[]} no se trata como \codigo{Animal[]}, porque a trav\'es de esa referencia podr\'ia insertarse otra subclase y romper el tipo real del arreglo.
+
 \section{C\'odigo de tres direcciones}
 
 TAC descompone expresiones complejas en instrucciones con a lo sumo dos operandos fuente y un resultado. Por ejemplo, \codigo{x = a + b * 4} se convierte en:
@@ -109,15 +218,36 @@ x = t1
 
 Esta forma simplifica la selecci\'on de instrucciones: cada cu\'adruplo tiene una traducci\'on local y los metadatos de tipo determinan si debe usarse la ALU entera o el coprocesador flotante.
 
+Cada instrucci\'on TAC incluye \codigo{op}, hasta dos argumentos, resultado, \`ambito, frame y ubicaci\'on de origen. Esta informaci\'on evita que el backend tenga que volver a inferir decisiones ya resueltas. Tambi\'en permite exportar evidencia en CSV y relacionar una instrucci\'on con el programa fuente.
+
+\begin{longtable}{p{3.5cm}p{4.4cm}p{5.3cm}}
+\toprule
+Familia TAC & Operaciones representativas & Responsabilidad\\\midrule
+\endhead
+Datos & MOV, PARAM, RETURN, PRINT & mover, pasar, retornar y observar valores\\
+Aritm\'etica & ADD, SUB, MUL, DIV, MOD, NEG & c\'alculo entero o flotante\\
+Control & LABEL, GOTO, IF\_TRUE, IF\_FALSE & construir el grafo de flujo\\
+Funciones & FUNC\_BEGIN, FUNC\_END, CALL & delimitar frames y llamadas\\
+Arreglos & NEW\_ARRAY, ARRAY\_GET, ARRAY\_SET & heap, longitud e indexaci\'on segura\\
+Objetos & NEW\_OBJECT, GET\_FIELD, SET\_FIELD & instancias, layouts y campos\\
+Closures & MAKE\_CLOSURE, CAPTURE, LOAD\_CAPTURE & funciones como valores y entornos\\
+Excepciones & TRY\_BEGIN, TRY\_END, CATCH\_BEGIN & handlers din\'amicos de runtime\\
+\bottomrule
+\end{longtable}
+
+Los saltos dividen TAC en bloques b\'asicos. Una etiqueta inicia un bloque; un salto o retorno lo termina. El grafo de control permite inspeccionar sucesores, confirmar que los destinos existen y considerar una instrucci\'on \codigo{RETURN} como terminadora, sin confundir el c\'odigo posterior con una ruta ejecutable.
+
 \section{Arquitectura MIPS32 y MARS}
 
 MIPS emplea un conjunto reducido de instrucciones y registros expl\'icitos. El proyecto usa registros temporales \codigo{\$t0--\$t9}, argumentos \codigo{\$a0--\$a1}, retornos \codigo{\$v0}/\codigo{\$f0}, stack pointer \codigo{\$sp}, frame pointer \codigo{\$fp}, return address \codigo{\$ra} y el registro \codigo{\$s7} como enlace al entorno de un closure.
 
 MARS 4.5 ensambla MIPS32 y ofrece syscalls educativas. Se emplean syscall 1 para enteros, 2 para flotantes, 4 para strings, 9 para memoria din\'amica y 10 para terminar el programa.
 
+MIPS32 es apropiado para el proyecto porque hace visibles decisiones que una arquitectura m\'as abstracta podr\'ia ocultar: d\'onde vive cada valor, qui\'en preserva un registro, c\'omo se calcula un offset y c\'omo se retorna de una funci\'on. MARS agrega un entorno reproducible sin exigir hardware f\'isico ni un sistema operativo MIPS.
+
 \section{Registros de activaci\'on}
 
-Cada llamada necesita un frame independiente para soportar recursi\'on. El tama\~no proviene de \codigo{ActivationRecord.totalBytes} y se alinea a ocho bytes.
+Cada llamada necesita un frame independiente para soportar recursi\'on. El tama\~no proviene del campo \codigo{totalBytes} del registro de activaci\'on y se alinea a ocho bytes.
 
 \begin{figure}[ht]
 \centering
@@ -126,6 +256,59 @@ Cada llamada necesita un frame independiente para soportar recursi\'on. El tama\
 \end{figure}
 
 El llamador apila argumentos de izquierda a derecha. La funci\'on reserva el frame, guarda estado y copia par\'ametros a offsets estables. Una \codigo{CALL} consume solo sus propios argumentos, lo cual resuelve correctamente llamadas anidadas.
+
+Un registro de activaci\'on no es solo espacio temporal. Es la frontera entre una invocaci\'on y otra: dos llamadas recursivas a \codigo{factorial} comparten el mismo c\'odigo, pero poseen par\'ametros, temporales y direcciones de retorno diferentes. El frame pointer ofrece una base estable aun cuando el stack pointer cambie al apilar argumentos de llamadas internas.
+
+\section{Heap, referencias y tiempo de vida}
+
+Los frames desaparecen al retornar; por eso no pueden almacenar datos que deban sobrevivir a una llamada. Arreglos, objetos, strings concatenados y entornos de closures se reservan en heap mediante syscall 9. Las variables conservan direcciones de 32 bits hacia esos bloques.
+
+Esta separaci\'on explica el tratamiento especial de closures. Una variable capturada no puede quedarse exclusivamente en el frame de la funci\'on creadora, porque el closure podr\'ia ejecutarse despu\'es del retorno. El compilador la representa mediante una celda compartida en heap y guarda un puntero a esa celda en el descriptor del closure.
+
+\chapter{Arquitectura de la soluci\'on}
+
+\section{Organizaci\'on por capas}
+
+La aplicaci\'on se divide en capas con responsabilidades observables. \archivo{src/lib/analyze.ts} orquesta el pipeline; \archivo{src/semantic} resuelve tipos, s\'imbolos y flujo; \archivo{src/tac} construye la representaci\'on intermedia, frames y layouts; \archivo{src/mips} genera y valida ensamblador; \archivo{src/ui} presenta el resultado; y \archivo{src/cli} reutiliza el mismo orquestador desde la terminal.
+
+\begin{longtable}{p{2.6cm}p{4.3cm}p{6.3cm}}
+\toprule
+Capa & Entrada / salida & Responsabilidad\\\midrule
+\endhead
+Lexer & texto $\rightarrow$ tokens & reconocer unidades y acumular errores l\'exicos\\
+Parser & tokens $\rightarrow$ CST & validar estructura y recuperarse en puntos seguros\\
+Sem\'antica & CST $\rightarrow$ modelo tipado & resolver s\'imbolos, tipos, herencia y flujo\\
+TAC & modelo v\'alido $\rightarrow$ cu\'adruplos & normalizar operaciones y calcular metadatos\\
+Backend & TAC $\rightarrow$ MIPS32 & seleccionar instrucciones, runtime y mirilla\\
+Presentaci\'on & resultado $\rightarrow$ paneles/archivos & inspeccionar, copiar y exportar evidencia\\
+\bottomrule
+\end{longtable}
+
+La CLI y la GUI no mantienen compiladores separados. Ambas invocan \codigo{analyzeInput}; por tanto, una correcci\'on del frontend o backend beneficia los dos caminos y las pruebas no validan una implementaci\'on distinta de la presentada al usuario.
+
+\section{Contratos y estados entre fases}
+
+Cada fase recibe una estructura definida y produce estado, datos y diagn\'osticos. La siguiente fase solo se ejecuta si se cumplen sus precondiciones. Esta decisi\'on evita dos fallos frecuentes: generar instrucciones a partir de un \`arbol recuperado ambiguo y mostrar como exitoso un ensamblador parcial.
+
+\begin{center}
+\fcolorbox{borde}{gris}{\parbox{0.9\textwidth}{
+\textbf{Regla de propagaci\'on:} un error l\'exico o sint\'actico omite sem\'antica, TAC y MIPS; un error sem\'antico omite TAC y MIPS; una inconsistencia TAC omite MIPS; un diagn\'ostico del backend produce \codigo{failed}. Solamente \codigo{completed} habilita la descarga del ensamblador.
+}}
+\end{center}
+
+El estado \codigo{skipped} no equivale a un fallo interno: significa que la fase no deb\'ia ejecutarse debido a una precondici\'on. \codigo{failed}, en cambio, indica que el backend fue solicitado pero detect\'o una referencia sin resolver, una etiqueta faltante o una operaci\'on no traducible. La distinci\'on mejora tanto la interfaz como la depuraci\'on.
+
+\section{Identidad de s\'imbolos y trazabilidad}
+
+Los nombres son convenientes para el usuario, pero no son identidades globales. Dos declaraciones \codigo{valor} en \`ambitos diferentes tienen \codigo{symbolId} distintos. TAC propaga esa identidad y el backend resuelve slots exclusivamente por ella. Esta regla corrige el riesgo de que una variable interior sobrescriba el almacenamiento de la exterior.
+
+La ubicaci\'on fuente tambi\'en viaja con las instrucciones. Cuando una fase reporta un error, puede apuntar a l\'inea y columna; cuando se exporta TAC, se conservan esos campos. La trazabilidad permite explicar no solo qu\'e ensamblador existe, sino qu\'e decisi\'on del programa lo origin\'o.
+
+\section{Determinismo y reproducibilidad}
+
+Los contadores de etiquetas, temporales y diagn\'osticos se reinician entre compilaciones. Los temporales liberados pueden reutilizarse y las variables locales sin inicializador se escriben con cero en el pr\'ologo. En consecuencia, la misma entrada produce una representaci\'on estable y no depende del contenido residual de la pila ni de una ejecuci\'on previa del IDE.
+
+La reproducibilidad se extiende al entorno: \codigo{npm ci} usa el lockfile, \codigo{npm run generate} reconstruye los artefactos ANTLR, el setup de MARS verifica SHA-256 y CI fija Java 17 para las pruebas externas.
 
 \chapter{Dise\~no e implementaci\'on}
 
@@ -146,13 +329,47 @@ failed & el backend detect\'o una inconsistencia\\
 \bottomrule
 \end{longtable}
 
+\section{Proceso de generaci\'on}
+
+El backend realiza el trabajo en etapas deliberadamente separadas:
+
+\begin{enumerate}
+  \item \textbf{Indexaci\'on.} Registra frames, funciones, layouts, vtables, constantes y s\'imbolos globales.
+  \item \textbf{Emisi\'on de datos.} Declara strings internados, constantes flotantes, vtables, descriptores est\'aticos y almacenamiento global.
+  \item \textbf{Emisi\'on de texto.} Traduce el cuerpo global como \codigo{main} y cada funci\'on bajo una etiqueta \`unica.
+  \item \textbf{Inclusi\'on de runtime.} Agrega solamente las rutinas auxiliares requeridas por las operaciones presentes.
+  \item \textbf{Validaci\'on.} Comprueba que referencias de salto, llamadas y direcciones correspondan a etiquetas definidas.
+  \item \textbf{Mirilla.} Elimina patrones redundantes y conserva m\'etricas antes/despu\'es.
+\end{enumerate}
+
+Separar estas etapas permite resolver referencias adelantadas: una funci\'on puede llamar a otra declarada despu\'es porque las etiquetas se conocen antes de emitir los cuerpos. Tambi\'en hace posible generar vtables completas antes de construir instancias.
+
 \section{Resoluci\'on de almacenamiento}
 
 Los operandos globales se convierten en etiquetas del segmento \codigo{.data}. Los operandos de la funci\'on activa usan su offset relativo a \codigo{\$fp}. Las constantes se materializan con \codigo{li}, \codigo{la} o \codigo{l.s}. Los valores persistentes se almacenan despu\'es de cada cu\'adruplo; as\'i no dependen de que un registro temporal sobreviva a saltos o llamadas.
 
+\begin{longtable}{p{3cm}p{4.2cm}p{5.9cm}}
+\toprule
+Clase de valor & Ubicaci\'on & Motivo\\\midrule
+\endhead
+Global & etiqueta en \codigo{.data} & vida durante todo el programa\\
+Par\'ametro & offset de \codigo{\$fp} & acceso estable dentro de la invocaci\'on\\
+Local & offset de \codigo{\$fp} & aislamiento entre llamadas y recursi\'on\\
+Temporal TAC & slot del frame & persistencia entre cu\'adruplos\\
+Constante entera & inmediato con \codigo{li} & no necesita memoria propia\\
+String/float constante & pool en \codigo{.data} & formato binario y reutilizaci\'on\\
+Objeto compuesto & puntero a heap & tama\~no din\'amico y vida extendida\\
+Captura & celda compartida en heap & sobrevivir al retorno del propietario\\
+\bottomrule
+\end{longtable}
+
+El backend no vuelve a buscar una variable local por nombre cuando existe \codigo{symbolId}. De esta forma, una declaraci\'on interior y otra exterior con el mismo texto ocupan slots diferentes. La regresi\'on correspondiente imprime \codigo{2} dentro del bloque y \codigo{1} despu\'es de salir.
+
 \section{Asignador getReg}
 
 El asignador administra \codigo{\$t0} a \codigo{\$t7} y reinicia su conjunto de uso en cada instrucci\'on TAC. Esta decisi\'on corresponde a la naturaleza de tres direcciones: los valores vivos entre instrucciones est\'an en slots, mientras que los registros sirven para cargar operandos y producir un resultado local.
+
+Los registros \codigo{\$t8} y \codigo{\$t9} se reservan para soporte interno, como punteros de funci\'on y comparaciones. La estrategia reporta asignaciones totales, m\'aximo simult\'aneo y spills. Si una instrucci\'on agotara el conjunto disponible, el backend producir\'ia un diagn\'ostico en lugar de reutilizar silenciosamente un registro vivo.
 
 \section{Selecci\'on de instrucciones}
 
@@ -171,17 +388,174 @@ PRINT & syscall & seleccionado por tipo\\
 \bottomrule
 \end{longtable}
 
-\section{Datos compuestos}
+\section{Convenci\'on de llamadas paso a paso}
 
-Los arreglos guardan longitud en el primer word y elementos desde el segundo. Los objetos reservan \codigo{ClassLayout.instanceSize}; el primer word apunta a una vtable y los campos usan offsets calculados en TAC. Cada m\'etodo ocupa un slot estable heredable, de modo que una sobrescritura despacha seg\'un la clase real del receptor. Un closure reserva un puntero a funci\'on seguido de sus capturas y usa \codigo{\$s7} como entorno activo.
+Para una llamada \codigo{f(a,b)}, el llamador eval\'ua y apila los argumentos de izquierda a derecha. Luego ejecuta \codigo{jal} para una funci\'on directa o \codigo{jalr} para un descriptor de m\'etodo/closure. Al entrar, el callee reserva un frame alineado, guarda \codigo{\$s7}, \codigo{\$fp} y \codigo{\$ra}, establece el nuevo frame pointer y copia los argumentos a slots conocidos.
+
+El valor de retorno entero, booleano, string o referencia se coloca en \codigo{\$v0}; un float usa \codigo{\$f0}. Todos los retornos saltan a un ep\'ilogo com\'un, que restaura el entorno del closure, la direcci\'on de retorno y el frame anterior. Finalmente, el llamador retira exactamente los argumentos pertenecientes a esa llamada.
+
+La limpieza exacta es indispensable para llamadas anidadas. Cuando \codigo{sumar} recibe los resultados de dos llamadas a \codigo{multiplicar}, el primer argumento ya calculado debe permanecer disponible mientras se ejecuta la segunda llamada interna. Limpiar toda la zona de argumentos producir\'ia un resultado incorrecto aunque cada funci\'on aislada pareciera funcionar.
+
+Los m\'etodos reciben el objeto receptor como primer par\'ametro impl\'icito. Los constructores siguen la misma convenci\'on, pero retornan el receptor inicializado. En herencia, el constructor hijo invoca primero al constructor padre compatible y despu\'es inicializa sus propios campos.
+
+\section{Arreglos y matrices}
+
+Un arreglo ocupa una palabra de longitud seguida por sus elementos. Reservar un arreglo de $n$ elementos requiere $(n+1)\times4$ bytes. Para acceder al elemento $i$, el runtime verifica que la referencia no sea nula, que $i\geq0$ y que $i<n$; solo entonces calcula $base+4(i+1)$.
+
+Una matriz no requiere un formato adicional: es un arreglo cuyos elementos son punteros a otros arreglos. Por ello \codigo{matriz[f][c]} se traduce como dos accesos seguros consecutivos. Esta composici\'on conserva longitudes diferentes por fila y reutiliza las mismas operaciones TAC y MIPS.
+
+\section{Objetos, layouts y despacho din\'amico}
+
+Los objetos reservan \codigo{ClassLayout.instanceSize}; el primer word apunta a la vtable de la clase real y los campos usan offsets calculados en TAC. Un layout hijo incorpora los campos heredados antes de agregar los propios, de modo que un m\'etodo base mantiene offsets v\'alidos cuando recibe una instancia hija.
+
+Cada m\'etodo ocupa un slot estable. Si una clase hija sobrescribe un m\'etodo, conserva el slot y reemplaza la direcci\'on en su vtable. Una llamada mediante una referencia base carga la vtable del objeto, selecciona el slot y ejecuta \codigo{jalr}; por eso se invoca el m\'etodo de la clase real, no el que sugiere solamente el tipo est\'atico.
+
+Antes de leer o escribir un campo se comprueba que el receptor no sea \codigo{null}. Si existe un handler activo, el error se transfiere al \codigo{catch}; de lo contrario, el runtime imprime el mensaje y termina de forma controlada, sin provocar una excepci\'on interna de MARS.
+
+\section{Closures y capturas}
+
+Un valor funci\'on se representa mediante un descriptor. El primer word contiene la direcci\'on del c\'odigo; los words siguientes contienen punteros a celdas capturadas. Una funci\'on sin capturas puede usar un descriptor est\'atico, mientras un closure con entorno necesita un descriptor en heap.
+
+Al invocar el descriptor, \codigo{\$s7} apunta al entorno activo. \codigo{LOAD\_CAPTURE} y \codigo{STORE\_CAPTURE} acceden a la celda compartida, no a una copia. Por eso dos llamadas al contador creado por una funci\'on anidada observan y modifican el mismo estado aun despu\'es de que la funci\'on creadora retorn\'o.
 
 \section{Strings y flotantes}
 
 Las cadenas constantes se internan para evitar duplicados. La concatenaci\'on solicita memoria y copia bytes; la igualdad compara byte a byte. Los flotantes usan instrucciones \codigo{l.s}, \codigo{s.s}, \codigo{add.s}, \codigo{sub.s}, \codigo{mul.s} y \codigo{div.s}. La promoci\'on entera se realiza con \codigo{mtc1} y \codigo{cvt.s.w}.
 
+Los booleanos se imprimen como \codigo{true} o \codigo{false}, y \codigo{null} como texto. Esta presentaci\'on mantiene la sem\'antica del lenguaje fuente y evita exponer al usuario valores internos como 0, 1 o una direcci\'on.
+
+\section{Errores de runtime y try/catch}
+
+El backend protege cuatro familias de operaciones: referencia de arreglo nula, \`indice fuera de l\'imites, referencia de objeto nula y divisi\'on/m\'odulo entre cero. Para floats, la comparaci\'on con cero ocurre en el coprocesador antes de ejecutar \codigo{div.s}.
+
+\codigo{TRY\_BEGIN} instala un registro din\'amico que conserva el handler anterior, \codigo{\$sp}, \codigo{\$fp}, \codigo{\$s7} y la etiqueta del bloque de captura. Si ocurre un error, el runtime restaura ese contexto antes de saltar al \codigo{catch}. Esta restauraci\'on permite capturar un fallo originado dentro de una llamada anidada sin continuar con un frame corrupto.
+
+\codigo{TRY\_END} desmonta el registro cuando la regi\'on termina normalmente. Los saltos generados para \codigo{break}, \codigo{continue} o \codigo{return} tambi\'en respetan los handlers que abandonan, evitando que un registro obsoleto capture un error posterior.
+
 \section{Mirilla}
 
 La optimizaci\'on local elimina movimientos de un registro hacia s\'i mismo, ajustes nulos de pila, saltos hacia la etiqueta siguiente y \codigo{nop} consecutivos. Se conserva la salida previa para auditor\'ia y se informa cu\'antas instrucciones se removieron.
+
+Las reglas son deliberadamente conservadoras: operan sobre patrones cuya equivalencia no depende de informaci\'on global. No se reordenan accesos a memoria, llamadas ni ramas condicionales. Esto satisface el requisito de mirilla sin introducir una fase de optimizaci\'on que pudiera modificar el comportamiento observable.
+
+\section{Validaci\'on del ensamblador generado}
+
+Antes de devolver \codigo{completed}, el backend inspecciona las referencias producidas por saltos, ramas, \codigo{jal} y carga de direcciones. Una etiqueta ausente se reporta como diagn\'ostico y bloquea la exportaci\'on. Esta validaci\'on estructural complementa, pero no reemplaza, la ejecuci\'on real en MARS: una salida puede tener etiquetas completas y aun contener un error de convenci\'on de llamadas, motivo por el cual existen ambos niveles de prueba.
+
+La validaci\'on final comprueba, como m\'inimo, las siguientes propiedades:
+
+\begin{longtable}{p{4cm}p{8.8cm}}
+\toprule
+Propiedad & Raz\'on\\\midrule
+\endhead
+Entrada definida & el segmento de texto debe contener un punto de inicio ejecutable\\
+Etiquetas \`unicas & dos bloques no pueden compartir el mismo destino simb\'olico\\
+Referencias resueltas & todo salto, rama, llamada y carga de direcci\'on debe apuntar a una etiqueta existente\\
+Frames conocidos & cada operando local debe resolverse contra el registro de activaci\'on correcto\\
+Runtime consistente & las rutinas auxiliares se emiten solo si son referidas y una sola vez\\
+Resultado sin diagn\'osticos & cualquier inconsistencia cambia el estado a \codigo{failed} y deshabilita la descarga\\
+\bottomrule
+\end{longtable}
+
+Esta etapa convierte errores del propio compilador en mensajes controlados. Sin ella, una referencia sin resolver podr\'ia descubrirse reci\'en al ensamblar o, peor a\'un, una direcci\'on incorrecta podr\'ia producir un fallo durante la ejecuci\'on sin indicar qu\'e decisi\'on del backend lo origin\'o.
+
+\chapter{Ejemplo completo de traducci\'on}
+
+\section{Programa fuente}
+
+El siguiente fragmento combina una funci\'on, una llamada y una expresi\'on aritm\'etica. Es peque\~no, pero permite observar todas las fronteras relevantes entre representaciones.
+
+\begin{verbatim}
+function doble(n: integer): integer {
+  return n * 2;
+}
+
+let base: integer = 5;
+let resultado: integer = doble(base + 1);
+print(resultado);
+\end{verbatim}
+
+El lexer reconoce palabras reservadas, identificadores, literales, signos y operadores. El parser comprueba que la declaraci\'on, los tipos, el bloque y las llamadas coincidan con la gram\'atica. La sem\'antica registra \codigo{doble}, verifica que recibe un entero, infiere que \codigo{base+1} es entero y confirma que el retorno puede asignarse a \codigo{resultado}.
+
+\section{Representaci\'on intermedia}
+
+Una versi\'on simplificada del TAC producido es:
+
+\begin{verbatim}
+FUNC_BEGIN doble
+PARAM_DEF n
+t0 = n * 2
+RETURN t0
+FUNC_END doble
+
+base = 5
+t1 = base + 1
+PARAM t1
+t2 = CALL doble, 1
+resultado = t2
+PRINT resultado
+\end{verbatim}
+
+La expresi\'on anidada se vuelve lineal. El valor \codigo{base+1} se calcula antes de la llamada; la cantidad \codigo{1} asociada a \codigo{CALL} indica cu\'antos argumentos debe retirar el llamador. El temporal de retorno se copia al s\'imbolo destino y luego se imprime.
+
+\section{Decisiones de almacenamiento}
+
+El frame de \codigo{doble} reserva slots para el par\'ametro \codigo{n} y el temporal \codigo{t0}, adem\'as de las palabras de control. El cuerpo global posee almacenamiento para \codigo{base}, \codigo{t1}, \codigo{t2} y \codigo{resultado}. La identidad de cada s\'imbolo determina el slot; el texto del nombre solo se conserva para lectura humana.
+
+\section{Esqueleto MIPS resultante}
+
+El ensamblador real agrega etiquetas y offsets concretos. El siguiente extracto conceptual muestra la relaci\'on con TAC:
+
+\begin{verbatim}
+fn_doble:
+  addiu $sp, $sp, -FRAME_SIZE
+  sw    $ra, RA_OFFSET($sp)
+  sw    $fp, FP_OFFSET($sp)
+  move  $fp, $sp
+  # cargar n, multiplicar por 2 y colocar retorno
+  lw    $t0, N_OFFSET($fp)
+  li    $t1, 2
+  mul   $t2, $t0, $t1
+  move  $v0, $t2
+  j     fn_doble_epilogue
+  nop
+
+main:
+  # base = 5; calcular base + 1
+  li    $t0, 5
+  addiu $t1, $t0, 1
+  addiu $sp, $sp, -4
+  sw    $t1, 0($sp)
+  jal   fn_doble
+  nop
+  addiu $sp, $sp, 4
+  # imprimir el retorno
+  move  $a0, $v0
+  li    $v0, 1
+  syscall
+\end{verbatim}
+
+El extracto omite detalles generados, pero hace visibles las obligaciones: reservar/restaurar el frame, preservar la direcci\'on de retorno, pasar el argumento, recibir el resultado y seleccionar syscall 1 por tratarse de un entero. La salida esperada en MARS es \codigo{12}.
+
+\section{Qu\'e ocurre si el programa es inv\'alido}
+
+Si \codigo{doble} fuera invocada con un string, la sem\'antica emitir\'ia \codigo{SEM007}. No se construir\'ia TAC para el programa y el ejemplo MIPS anterior nunca se producir\'ia. Esta conducta es una propiedad del pipeline, no una decisi\'on visual de ocultar texto: el backend no recibe un \codigo{TacGenerationResult} v\'alido.
+
+\section{Lectura comparativa del ejemplo}
+
+El mismo comportamiento puede observarse en tres niveles. Cada nivel responde una pregunta diferente y juntos permiten explicar el proceso sin confundir abstracciones.
+
+\begin{longtable}{p{2.8cm}p{4.7cm}p{5.3cm}}
+\toprule
+Nivel & Pregunta & Evidencia\\\midrule
+\endhead
+Compiscript & \textquestiondown Qu\'e desea expresar el programador? & tipos, funci\'on, llamada y print\\
+TAC & \textquestiondown En qu\'e orden ocurren las operaciones? & temporales, PARAM, CALL y RETURN\\
+MIPS & \textquestiondown C\'omo se ejecuta en la m\'aquina? & frame, pila, registros, jal y syscall\\
+\bottomrule
+\end{longtable}
+
+La salida \codigo{12} demuestra el resultado observable, mientras la inspecci\'on de TAC y MIPS explica por qu\'e se obtiene. En una evaluaci\'on conviene mostrar ambos aspectos: ejecutar el archivo comprueba compatibilidad; recorrer las representaciones demuestra que el ensamblador se origin\'o en TAC y no en una ruta paralela.
 
 \chapter{Interfaz y experiencia de uso}
 
@@ -193,6 +567,39 @@ El selector de archivos est\'a dentro de la GUI y acepta \archivo{.cps}. Los res
 
 La interfaz renovada conserva el flujo del compilador y reorganiza su presentaci\'on como un workbench: barra superior unificada, controles compactos, editor central, explorador lateral e inspector vertical. El sistema visual emplea superficies transl\'ucidas, radios consistentes y acentos violeta, cian y verde. El tema claro mantiene la misma jerarqu\'ia mediante fondos azulados suaves, contraste oscuro y paneles blancos transl\'ucidos, sin perder legibilidad ni estados sem\'anticos.
 
+\section{Distribuci\'on del workbench}
+
+\begin{longtable}{p{3.2cm}p{9.9cm}}
+\toprule
+Zona & Funci\'on\\\midrule
+\endhead
+Barra superior & archivo, modo, ejecuci\'on, tema y acciones principales\\
+Explorador lateral & navegaci\'on entre entrada, fases y vistas disponibles\\
+Editor central & edici\'on Monaco con numeraci\'on, selecci\'on y resaltado\\
+Pipeline & estado observable de lexer, parser, sem\'antica, TAC y MIPS\\
+Inspector derecho & tokens, \`arboles, s\'imbolos, frames, TAC y ensamblador\\
+Panel de problemas & diagn\'osticos filtrables con severidad y ubicaci\'on\\
+Barra de estado & resumen de entrada, fase activa y resultado de compilaci\'on\\
+\bottomrule
+\end{longtable}
+
+La jerarqu\'ia visual separa acciones de contenido: compilar y cargar permanecen visibles, mientras los detalles t\'ecnicos se agrupan en pesta\~nas e inspectores. Esta organizaci\'on reduce desplazamientos y permite demostrar el pipeline sin abrir herramientas externas para cada fase.
+
+\section{Flujo de uso}
+
+\begin{enumerate}
+  \item El usuario escribe Compiscript o selecciona un archivo \archivo{.cps} desde Archivo.
+  \item Al presionar Analizar, el orquestador ejecuta las fases permitidas por el modo.
+  \item El pipeline actualiza cada estado y el panel de problemas presenta diagn\'osticos acumulados.
+  \item Para una entrada v\'alida, el inspector habilita TAC, frames, MIPS y m\'etricas.
+  \item La descarga \archivo{compiscript.asm} solo aparece cuando MIPS est\'a completo.
+  \item El usuario ejecuta el archivo con MARS y compara la salida con el resultado esperado.
+\end{enumerate}
+
+\section{Exportaci\'on de evidencia}
+
+Adem\'as del ensamblador, la aplicaci\'on puede exportar resultados de an\'alisis, tokens, s\'imbolos y TAC en formatos legibles. Estas exportaciones son \`utiles para explicar una calificaci\'on, reproducir un fallo o comparar dos versiones. La descarga conserva los diagn\'osticos y estados omitidos; no presenta una entrada rechazada como si hubiera llegado al final del pipeline.
+
 \chapter{CLI y ejecuci\'on externa}
 
 La CLI comparte \codigo{analyzeInput}; no posee un compilador alterno. El modo MIPS acepta \codigo{--out}:
@@ -200,16 +607,83 @@ La CLI comparte \codigo{analyzeInput}; no posee un compilador alterno. El modo M
 \begin{verbatim}
 npm run cli -- examples/mips/07_recursion.cps \
   --mode mips --out factorial.asm
-java -jar Mars4_5.jar nc ae1 factorial.asm
+java -jar "C:\Herramientas\Mars4_5.jar" nc ae1 factorial.asm
 \end{verbatim}
 
-El script \archivo{scripts/run-mars.mjs} busca el JAR en el segundo argumento, en \codigo{MARS\_JAR} o en \archivo{tools/Mars4\_5.jar}. MARS sigue siendo una herramienta externa: el IDE genera y exporta, pero no simula internamente.
+El script \archivo{scripts/run-mars.mjs} busca el JAR en el segundo argumento, en \codigo{MARS\_JAR} o en \archivo{tools/Mars4\_5.jar}. En el equipo de entrega se encuentra en \archivo{C:/Herramientas/Mars4\_5.jar}; puede seleccionarse sin modificar el repositorio mediante la variable de entorno o como segundo argumento del runner. MARS sigue siendo una herramienta externa: el IDE genera y exporta, pero no simula internamente.
+
+\section{Modos de la CLI}
+
+\begin{longtable}{p{2.4cm}p{4.2cm}p{6.5cm}}
+\toprule
+Modo & Fase final & Uso principal\\\midrule
+\endhead
+lexer & tokens & aislar reconocimiento y errores l\'exicos\\
+parser & CST & comprobar gram\'atica y recuperaci\'on\\
+semantic & modelo tipado & revisar diagn\'osticos, s\'imbolos y \`ambitos\\
+tac & representaci\'on intermedia & inspeccionar cu\'adruplos, CFG y frames\\
+mips & ensamblador & generar \archivo{.asm} para MARS\\
+\bottomrule
+\end{longtable}
+
+La CLI devuelve un c\'odigo distinto de cero si una fase solicitada falla y no escribe el archivo de salida cuando el programa es inv\'alido. Esta propiedad permite integrarla a scripts y CI sin depender de interpretar texto de consola.
+
+\section{Ejecuci\'on reproducible en PowerShell}
+
+\begin{verbatim}
+npm.cmd ci
+npm.cmd run cli -- .\examples\mips\07_recursion.cps `
+  --mode mips --out .\factorial.asm
+$env:MARS_JAR = "C:\Herramientas\Mars4_5.jar"
+npm.cmd run mars -- .\factorial.asm
+\end{verbatim}
+
+La salida esperada es \codigo{120}. La opci\'on \codigo{ae1} utilizada por el runner hace que MARS retorne c\'odigo 1 si el ensamblado falla; de este modo un archivo sint\'acticamente incorrecto no puede aparecer como prueba aprobada.
+
+\section{Diagn\'ostico de la ejecuci\'on externa}
+
+\begin{longtable}{p{4.2cm}p{8.5cm}}
+\toprule
+Situaci\'on & Comprobaci\'on recomendada\\\midrule
+\endhead
+Java no se reconoce & ejecutar \codigo{java -version} y confirmar Java 17 o posterior\\
+MARS no se encuentra & verificar \archivo{C:/Herramientas/Mars4\_5.jar} o definir \codigo{MARS\_JAR}\\
+El ensamblado falla & usar el runner con \codigo{ae1} y revisar l\'inea/etiqueta informada por MARS\\
+No aparece salida & confirmar que el programa alcanza \codigo{PRINT} y que la syscall corresponde al tipo\\
+La suite omite MARS & definir \codigo{REQUIRE\_MARS=1} para convertir la omisi\'on en un error expl\'icito\\
+Salida inesperada & comparar primero TAC, frames y cantidad de argumentos de cada \codigo{CALL}\\
+\bottomrule
+\end{longtable}
+
+La ruta del JAR es configuraci\'on del equipo, no una dependencia versionada. Mantenerla fuera del repositorio evita distribuir software externo y permite que cada integrante o runner seleccione su propia ubicaci\'on.
 
 \chapter{Pruebas y resultados}
+
+\section{Estrategia de verificaci\'on}
+
+La verificaci\'on se organiza como una pir\'amide. Las pruebas unitarias detectan errores locales con rapidez; las de integraci\'on recorren varias fases; las regresiones preservan correcciones de auditor\'ia; y las ejecuciones MARS validan el comportamiento observable del programa ensamblado.
+
+\begin{longtable}{p{3.1cm}p{4.8cm}p{5.2cm}}
+\toprule
+Nivel & Qu\'e comprueba & Ejemplo de fallo detectado\\\midrule
+\endhead
+Lexer/parser & tokens, mensajes y recuperaci\'on & detenerse tras el primer error\\
+Sem\'antica & tipos, \`ambitos, herencia y flujo & aceptar un argumento incompatible\\
+TAC & orden, destinos, frames y metadatos & salto a bloque incorrecto\\
+Backend estructural & opcodes, etiquetas, runtime y mirilla & omitir una vtable o un handler\\
+MARS & salida real y errores de runtime & convenci\'on de pila incorrecta\\
+UI/exportaci\'on & estados, controles y archivos & habilitar descarga tras un error\\
+Build/auditor\'ia & tipado, empaquetado y dependencias & importar un m\'odulo inv\'alido\\
+\bottomrule
+\end{longtable}
+
+Cada correcci\'on de alto impacto incorpora una regresi\'on. Por ejemplo, el despacho din\'amico se verifica con una referencia base que contiene una instancia hija; el \emph{shadowing} imprime los valores interior y exterior; y la limpieza de argumentos se ejercita con llamadas anidadas. Esta pr\'actica evita que una mejora posterior reintroduzca un defecto ya resuelto.
 
 \section{Suite automatizada}
 
 La suite final contiene 232 casos en 15 archivos: 191 se ejecutan sin herramientas externas y 41 validan la salida real en MARS cuando Java y el JAR est\'an disponibles. Las pruebas del backend verifican generaci\'on completa, convenci\'on de pila, arreglos, runtime de strings, llamadas anidadas, closures, despacho din\'amico, constructores heredados, errores de objeto nulo y divisi\'on entre cero, recuperaci\'on de \texttt{try/catch}, bloqueo por errores y mirilla. Las pruebas heredadas contin\'uan verificando lexer, parser, sem\'antica, s\'imbolos, TAC, CFG, UI y la exportaci\'on del modo MIPS.
+
+Los 191 casos independientes de herramientas externas permiten obtener retroalimentaci\'on incluso si MARS no est\'a instalado. Sin embargo, no se confunden con ejecuci\'on de ensamblador: cuando \codigo{REQUIRE\_MARS=1}, la ausencia de Java o del JAR hace fallar la suite en lugar de omitir silenciosamente los 41 escenarios.
 
 \section{Validaci\'on real en MARS}
 
@@ -226,10 +700,34 @@ flotantes & 4.0\\
 factorial recursivo & 120\\
 closure & 1\\
 clase, m\'etodo y llamada anidada & 2; 6; 12\\
+shadowing de bloque & 2; 1\\
+despacho din\'amico & Toby ladra\\
+divisi\'on entre cero capturada & mensaje de runtime y continuaci\'on\\
 \bottomrule
 \end{longtable}
 
+Las matrices se validan adem\'as con un caso manual reproducible que crea \codigo{integer[][]}, modifica una celda y comprueba las salidas \codigo{9} y \codigo{3}. Se documenta por separado para no atribuir a la suite permanente una cobertura que pertenece a la gu\'ia de aceptaci\'on.
+
 El caso de errores mezclados produce diagn\'osticos, deja TAC/MIPS en \codigo{skipped} y no crea un archivo ensamblador.
+
+\section{Pruebas negativas y recuperaci\'on}
+
+Los casos negativos no buscan solamente confirmar que ``hay un error''. Se espera una cantidad y categor\'ia razonables de diagn\'osticos, que el analizador alcance construcciones posteriores, que no repita indefinidamente el mismo mensaje y que bloquee las fases incompatibles.
+
+\begin{longtable}{p{3.2cm}p{5.1cm}p{4.8cm}}
+\toprule
+Entrada & Resultado esperado & Propiedad observada\\\midrule
+\endhead
+Tres caracteres inv\'alidos & tres errores l\'exicos & continuaci\'on y deduplicaci\'on\\
+Tres puntos y coma ausentes & tres errores sint\'acticos & sincronizaci\'on del parser\\
+Errores combinados & l\'exicos y sint\'acticos juntos & fases independientes\\
+Errores sem\'anticos variados & c\'odigos SEM distintos & acumulaci\'on del visitor\\
+Arreglo covariante mutable & SEM003 & seguridad de tipos\\
+300 par\'entesis & diagn\'ostico estructural \`unico & protecci\'on contra desbordamiento\\
+\bottomrule
+\end{longtable}
+
+Los errores de runtime tienen una expectativa diferente. La compilaci\'on s\'i es v\'alida, por lo que TAC y MIPS se generan; la comprobaci\'on ocurre durante la ejecuci\'on. Un fallo no capturado imprime un mensaje controlado y termina antes de ejecutar instrucciones posteriores. Dentro de \codigo{try/catch}, el mensaje se entrega a la variable de captura y el programa contin\'ua.
 
 \section{Comandos de verificaci\'on}
 
@@ -243,6 +741,18 @@ npm audit
 \end{verbatim}
 
 TypeScript, 191 pruebas independientes de herramientas externas y el build terminan correctamente; los 41 escenarios MARS tambi\'en fueron ejecutados y son obligatorios en CI. La auditor\'ia completa de dependencias reporta cero vulnerabilidades.
+
+\section{Interpretaci\'on de resultados}
+
+La cantidad de pruebas por s\'i sola no demuestra correcci\'on; su valor proviene de la diversidad de propiedades observadas. Las pruebas de estructura confirman que se emiten instrucciones esperadas, mientras MARS confirma que la combinaci\'on completa produce una salida. Las pruebas negativas demuestran el bloqueo y la recuperaci\'on, y el build confirma que los contratos TypeScript permanecen coherentes.
+
+No se reemplaza MARS con una expresi\'on regular ni con un int\'erprete propio. Los procesos de prueba escriben ensamblador temporal, invocan el JAR oficial en modo CLI y comparan stdout/c\'odigo de salida. Esta distinci\'on es importante porque errores de offsets, frames o delay slots pueden pasar una inspecci\'on textual y fallar solamente al ejecutar.
+
+\section{Integraci\'on continua}
+
+El workflow de GitHub instala Node y Java 17, restaura dependencias mediante el lockfile, prepara MARS con verificaci\'on de hash y activa \codigo{REQUIRE\_MARS=1}. Luego ejecuta check, pruebas, build y ejemplos TAC/MIPS. Los eventos de pull request, cambios a \codigo{main} y releases utilizan esta verificaci\'on antes del empaquetado.
+
+Para distribuci\'on, Windows produce instalador NSIS y ejecutable portable; macOS y Linux requieren runners de sus respectivos sistemas. La firma de binarios y la publicaci\'on de un tag permanecen como acciones externas al c\'odigo fuente.
 
 \chapter{Trazabilidad con el enunciado}
 
@@ -258,21 +768,44 @@ M\'ultiples errores y recuperaci\'on & Cumple & listeners, estrategia ANTLR y vi
 No TAC/MIPS ante errores & Cumple & estados y pruebas negativas\\
 Mirilla & Cumple & optimizador y m\'etricas\\
 Ensamblador ejecutable & Cumple & 41 escenarios MARS aprobados y exigidos en CI\\
+Casos de prueba propios & Cumple & ejemplos MIPS, TAC, sem\'anticos y de r\'ubrica\\
+Evitar cascadas y ciclos & Cumple & normalizaci\'on, l\'imites y regresiones de recuperaci\'on\\
+Arquitectura destino documentada & Cumple & MIPS32, MARS, frames, heap y syscalls\\
 No c\'odigo objeto ni ejecuci\'on interna & Cumple & exportaci\'on a herramienta externa\\
 \bottomrule
 \end{longtable}
 
+\section{Evidencia observable durante la demostraci\'on}
+
+La trazabilidad no depende de afirmar que un archivo existe. Para una demostraci\'on completa se carga \archivo{examples/tac/13\_programa\_integral.cps}, se ejecuta el pipeline y se observan dentro de la interfaz tokens, \`arbol, s\'imbolos, TAC, frames y MIPS. El ensamblador descargado debe imprimir \codigo{2}, \codigo{6} y \codigo{12} en MARS.
+
+Luego se carga \archivo{examples/mips/05\_bloqueo\_por\_errores.cps}. La interfaz debe mostrar los problemas, marcar las fases posteriores como omitidas y deshabilitar la descarga. Esta segunda mitad es tan importante como el caso positivo, porque demuestra el requisito expl\'icito de no generar representaci\'on intermedia ni ensamblador ante errores previos.
+
+\section{Responsabilidad individual}
+
+El grupo individual autorizado \textbf{Daniel-Barillas} corresponde a \textbf{Pablo Daniel Barillas Moreno, carn\'e 22193}; la misma identidad aparece en la portada y los metadatos.
+
 \chapter{Limitaciones y trabajo futuro}
 
-Compiscript no expone una sentencia \codigo{throw} de usuario; sin embargo, el backend utiliza \codigo{TRY\_BEGIN}, \codigo{TRY\_END} y \codigo{CATCH\_BEGIN} para registrar handlers din\'amicos. Los errores de arreglos restauran \codigo{\$sp}, \codigo{\$fp} y \codigo{\$s7}, incluso al atravesar una llamada, y transfieren el mensaje al bloque \codigo{catch}. No existe una fase global de optimizaci\'on, de acuerdo con el alcance: se aplica mirilla local.
+Compiscript no expone una sentencia \codigo{throw} de usuario; sin embargo, el backend utiliza \codigo{TRY\_BEGIN}, \codigo{TRY\_END} y \codigo{CATCH\_BEGIN} para registrar handlers din\'amicos. Los errores de runtime definidos restauran \codigo{\$sp}, \codigo{\$fp} y \codigo{\$s7}, incluso al atravesar una llamada, y transfieren el mensaje al bloque \codigo{catch}.
 
-Como evoluci\'on podr\'ian incorporarse una sentencia \codigo{throw} en el lenguaje, tipos de excepci\'on, asignaci\'on global de registros por liveness y optimizaciones entre bloques. Estas mejoras no son necesarias para el alcance actual.
+La memoria de heap se obtiene mediante syscall 9 y no se libera, porque MARS no ofrece un recolector de basura integrado y el alcance no exige administraci\'on manual completa. Esta decisi\'on es adecuada para programas educativos de duraci\'on limitada, pero no para procesos de larga vida con asignaci\'on intensiva.
+
+No existe una fase global de optimizaci\'on, de acuerdo con el alcance: se aplica mirilla local. Los valores persistentes regresan a slots entre instrucciones, una estrategia robusta y explicable que sacrifica parte del rendimiento frente a una asignaci\'on global basada en liveness.
+
+MARS implementa un entorno educativo y syscalls particulares; el ensamblador generado est\'a orientado a esa compatibilidad. Portarlo a Linux MIPS o a hardware real requerir\'ia revisar ABI, syscalls, formato ejecutable y enlazado.
+
+Como evoluci\'on podr\'ian incorporarse una sentencia \codigo{throw} en el lenguaje, tipos de excepci\'on, recolecci\'on de memoria, asignaci\'on global de registros por liveness, optimizaciones entre bloques y un backend alternativo. Estas mejoras no son necesarias para el alcance actual y deber\'ian introducirse con nuevas pruebas de equivalencia sem\'antica.
 
 \chapter{Conclusiones}
 
 El Proyecto 3 integra de forma coherente las fases anteriores y produce ensamblador MIPS32 real desde TAC. La convenci\'on de llamadas permite funciones, anidamiento y recursi\'on; el modelo de heap cubre arreglos, objetos, cadenas y closures; los estados impiden exportar resultados inv\'alidos; y la interfaz hace observable todo el proceso.
 
 La evidencia combina pruebas unitarias, integraci\'on, build de producci\'on y ejecuci\'on en MARS 4.5. Por ello, la afirmaci\'on de compatibilidad no depende solamente de documentaci\'on o de ejemplos de ensamblador, sino de resultados reproducibles.
+
+Las correcciones de auditor\'ia muestran adem\'as que los riesgos m\'as delicados aparecen en los l\'imites entre capas: identidad sem\'antica y almacenamiento, argumentos y frames, tipo est\'atico y clase real, o error de runtime y restauraci\'on de contexto. Mantener contratos expl\'icitos y regresiones ejecutables result\'o m\'as valioso que concentrar toda la l\'ogica en un generador monol\'itico.
+
+Finalmente, la GUI no es un accesorio separado del compilador. Presenta los mismos estados y estructuras que usan la CLI y las pruebas, por lo que permite explicar c\'omo una entrada se transforma y por qu\'e una entrada inv\'alida se bloquea. El producto final cumple as\'i una funci\'on t\'ecnica y una funci\'on pedag\'ogica.
 
 \appendix
 \chapter{Mapa de archivos}
@@ -291,9 +824,70 @@ Archivo & Responsabilidad\\\midrule
 \archivo{src/cli/run.ts} & modo MIPS y escritura \archivo{.asm}\\
 \archivo{scripts/run-mars.mjs} & invocaci\'on externa de MARS\\
 \archivo{src/__tests__/mips.test.ts} & regresiones del backend\\
+\archivo{src/__tests__/mips.execution.test.ts} & 41 ejecuciones reales en MARS\\
 \archivo{examples/mips} & demostraciones y caso de bloqueo\\
+\archivo{docs/GUIA_PRUEBAS_COMPLETA.md} & casos manuales y resultados esperados\\
+\archivo{docs/MATRIZ_REQUISITOS.md} & trazabilidad detallada de la r\'ubrica\\
 \bottomrule
 \end{longtable}
 \endgroup
+
+\chapter{Cat\'alogo resumido de diagn\'osticos}
+
+\begin{longtable}{p{2cm}p{4.8cm}p{6.2cm}}
+\toprule
+C\'odigo & Categor\'ia & Ejemplo\\\midrule
+\endhead
+SEM001 & identificador no declarado & usar \codigo{total} fuera de su alcance\\
+SEM002 & redeclaraci\'on & declarar dos veces un nombre en el mismo \`ambito\\
+SEM003 & asignaci\'on incompatible & asignar string a integer o modificar const\\
+SEM004 & operador inv\'alido & aplicar m\'odulo a operandos float\\
+SEM005 & condici\'on no booleana & usar integer como condici\'on de if\\
+SEM006--007 & llamada inv\'alida & aridad o tipo de argumento incorrecto\\
+SEM008--011 & control inv\'alido & retorno incompatible o break/continue fuera de contexto\\
+SEM012--014 & clases y miembros & miembro inexistente, this o constructor inv\'alido\\
+SEM015--017 & arreglos & \`indice no entero, valor no indexable o elementos incompatibles\\
+SEM018 & c\'odigo inalcanzable & instrucci\'on posterior a un terminador\\
+SEM019--021 & declaraci\'on y flujo & par\'ametro duplicado, herencia o switch inv\'alido\\
+SEM023 & uso antes de inicializaci\'on & leer un local antes de asignarle valor\\
+\bottomrule
+\end{longtable}
+
+El diagn\'ostico incluye severidad, mensaje, l\'inea, columna y, cuando aplica, informaci\'on relacionada con la declaraci\'on original. Los warnings se conservan para inspecci\'on; los errores determinan el bloqueo de las fases posteriores.
+
+\chapter{Comandos de reproducci\'on}
+
+\section{Preparaci\'on y desarrollo}
+
+\begin{verbatim}
+npm.cmd ci
+npm.cmd run generate
+npm.cmd run check
+npm.cmd run dev
+\end{verbatim}
+
+La interfaz queda disponible en \codigo{http://localhost:3000}. Para el uso cotidiano, una vez instaladas las dependencias, basta con \codigo{npm.cmd run dev}.
+
+\section{Verificaci\'on completa}
+
+\begin{verbatim}
+$env:MARS_JAR = "C:\Herramientas\Mars4_5.jar"
+$env:REQUIRE_MARS = "1"
+npm.cmd run verify
+npm.cmd audit --audit-level=moderate
+\end{verbatim}
+
+El resultado documentado es: 15 archivos de prueba, 232 pruebas aprobadas, 41 ejecuciones MARS incluidas, build de producci\'on aprobado y cero vulnerabilidades reportadas.
+
+\section{Generaci\'on y ejecuci\'on manual}
+
+\begin{verbatim}
+npm.cmd run cli -- .\examples\mips\07_recursion.cps `
+  --mode mips --out .\factorial.asm
+npm.cmd run mars -- .\factorial.asm `
+  "C:\Herramientas\Mars4_5.jar"
+\end{verbatim}
+
+La salida esperada es \codigo{120}. Si MARS devuelve c\'odigo distinto de cero, el ensamblado o la ejecuci\'on deben considerarse fallidos aunque el archivo \archivo{.asm} exista.
 
 \end{document}
