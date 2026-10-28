@@ -178,7 +178,12 @@ export function analyzeInput(
   const mips = mode === "mips"
     ? generateMips(tac)
     : emptyMipsResult("not-requested", "La fase MIPS no fue solicitada.");
-  const accepted = frontendAccepted && (mode !== "mips" || mips.status === "completed");
+  const tacErrorCount = tac.diagnostics.filter((diagnostic) => diagnostic.severity === "error").length;
+  const mipsErrorCount = mips.diagnostics.filter((diagnostic) => diagnostic.severity === "error").length;
+  const codeGenerationAccepted =
+    ((mode !== "tac" && mode !== "mips") || (tac.status === "completed" && tacErrorCount === 0)) &&
+    (mode !== "mips" || (mips.status === "completed" && mipsErrorCount === 0));
+  const accepted = frontendAccepted && codeGenerationAccepted;
 
   return {
     language: "Compiscript",
@@ -206,7 +211,7 @@ export function analyzeInput(
       syntaxErrorCount: syntaxErrors.length,
       semanticErrorCount: semantic.errors.length,
       semanticWarningCount: semantic.warnings.length,
-      totalErrorCount: lexicalErrors.length + syntaxErrors.length + semantic.errors.length + mips.diagnostics.filter((diagnostic) => diagnostic.severity === "error").length,
+      totalErrorCount: lexicalErrors.length + syntaxErrors.length + semantic.errors.length + tacErrorCount + mipsErrorCount,
       symbolCount: semantic.metrics.symbolCount,
       scopeCount: semantic.metrics.scopeCount
     }

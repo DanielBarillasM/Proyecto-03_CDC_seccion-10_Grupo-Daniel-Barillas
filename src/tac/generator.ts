@@ -126,8 +126,10 @@ class TacGenerator {
       this.temps.endFrame(this.currentFrameId);
       this.finalizeFrames();
       const controlFlow = buildTacControlFlow(this.instructions);
+      const failed = this.diagnostics.some((diagnostic) => diagnostic.severity === "error");
       return {
-        status: "completed",
+        status: failed ? "failed" : "completed",
+        ...(failed ? { skipReason: "La generación TAC produjo errores y el resultado no es exportable." } : {}),
         instructions: this.instructions,
         formattedCode: formatTac(this.instructions),
         basicBlocks: controlFlow.blocks,
@@ -1009,7 +1011,7 @@ class TacGenerator {
   private memberType(type: SemanticType | undefined, name: string): SemanticType {
     const classId = type?.kind === "instance" || type?.kind === "class" ? type.classId : undefined;
     const layout = this.classLayouts.find((candidate) => candidate.classId === classId);
-    const field = layout?.fields.find((candidate) => candidate.name === name);
+    const field = [...(layout?.fields ?? [])].reverse().find((candidate) => candidate.name === name);
     if (field) return field.type;
     const method = layout?.methods?.find((candidate) => candidate.name === name);
     return this.semantic.symbols.find((symbol) => symbol.id === method?.symbolId)?.type ?? T.unknown;

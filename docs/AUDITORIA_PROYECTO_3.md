@@ -8,7 +8,7 @@
 
 La implementación cubre el pipeline obligatorio y el caso que originó la revisión quedó corregido: una entrada válida o un archivo propio ejecuta el modo `mips`; si frontend y TAC terminan correctamente, la UI genera ensamblador y habilita su descarga. Si existe un error previo, MIPS queda en `skipped` y no se produce artefacto.
 
-La suite contiene **41 casos de ejecución MARS** para enteros, floats, cadenas, funciones, llamadas anidadas, recursión, arreglos, objetos, herencia, métodos, despacho dinámico, constructores heredados, closures, errores de ejecución y `try/catch`. Las matrices se validan mediante el caso manual reproducible de la guía completa de pruebas. El workflow instala Java y exige la ejecución MARS; en una máquina sin Java o sin el JAR, Vitest los omite explícitamente en vez de reportar un falso positivo.
+La suite contiene **42 casos de ejecución MARS** para enteros, floats, cadenas, funciones, llamadas anidadas, recursión, arreglos, objetos, herencia, métodos, despacho dinámico, constructores heredados, closures, errores de ejecución y `try/catch`. Las matrices se validan mediante el caso manual reproducible de la guía completa de pruebas. El workflow instala Java y exige la ejecución MARS; en una máquina sin Java o sin el JAR, Vitest los omite explícitamente en vez de reportar un falso positivo.
 
 ## Problemas corregidos
 
@@ -39,6 +39,9 @@ La suite contiene **41 casos de ejecución MARS** para enteros, floats, cadenas,
 | Alta | El backend resolvía símbolos homónimos por nombre y el `shadowing` podía sobrescribir el slot exterior | Resolución de slots exclusivamente por `symbolId` y regresión MARS que comprueba las salidas `2`, `1` |
 | Media | Anidamiento sintáctico extremo podía agotar la pila de JavaScript | Límite estructural previo al parser con diagnóstico único y bloqueo de fases posteriores |
 | Media | Variables locales sin inicializador dependían del contenido residual de la pila | Inicialización determinista a cero en el prólogo de cada función |
+| Alta | Una sobrescritura podía cambiar parámetros o retorno pese a compartir el slot heredado de la vtable | Validación final de firmas con `SEM007`, incluso con clases declaradas fuera de orden |
+| Alta | Un constructor hijo podía reenviar al padre una cantidad o tipos incompatibles | Validación semántica previa con `SEM006`/`SEM007`; TAC y MIPS quedan bloqueados |
+| Alta | Un campo homónimo de una clase hija se traducía usando el offset del campo padre | Resolución del miembro más derivado en TAC y MIPS, con regresión ejecutada en MARS |
 
 ## Evidencia reproducible
 
@@ -53,11 +56,11 @@ npm.cmd run cli:mips
 Resultado verificado:
 
 - TypeScript aprobado;
-- 232 pruebas aprobadas en 15 archivos, incluidos 41 casos ejecutados en MARS 4.5;
+- 235 pruebas aprobadas en 15 archivos, incluidos 42 casos ejecutados en MARS 4.5;
 - build Vite aprobado;
 - auditoría npm completa: 0 vulnerabilidades;
 - CLI TAC y MIPS ejecutadas correctamente;
-- workflow preparado para exigir los 41 casos MARS con Java 17.
+- workflow preparado para exigir los 42 casos MARS con Java 17.
 
 ## Salidas observadas en MARS
 

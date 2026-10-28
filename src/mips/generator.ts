@@ -424,7 +424,7 @@ class Generator {
       this.emit(`  lw ${r}, 0(${a})`, `  lw ${r}, ${method.slot * 4}(${r})`);
       this.storeWord(r, i.result, i); return;
     }
-    const field = layout?.fields.find((candidate) => candidate.name === name);
+    const field = [...(layout?.fields ?? [])].reverse().find((candidate) => candidate.name === name);
     if (!field) return this.error("MIPS027", `Campo o método desconocido: ${name}.`, i);
     const a = this.registers.getReg(); this.loadWord(i.arg1, a, i); this.checkObject(a);
     if (primitive(i.result.type, "float")) { this.emit(`  l.s $f2, ${field.offset}(${a})`); this.storeFloat("$f2", i.result, i); }
@@ -432,7 +432,7 @@ class Generator {
   }
   private setField(i: TacInstruction): void {
     if (!i.arg1 || !i.arg2 || !i.result) return this.error("MIPS028", "SET_FIELD incompleto.", i);
-    const field = this.layout(i.arg1.type)?.fields.find((candidate) => candidate.name === String(i.arg2?.value));
+    const field = [...(this.layout(i.arg1.type)?.fields ?? [])].reverse().find((candidate) => candidate.name === String(i.arg2?.value));
     if (!field) return this.error("MIPS029", `Campo desconocido: ${String(i.arg2.value)}.`, i);
     const a = this.registers.getReg(); this.loadWord(i.arg1, a, i); this.checkObject(a);
     if (primitive(field.type, "float")) { this.loadFloat(i.result, "$f2", i); this.emit(`  s.s $f2, ${field.offset}(${a})`); }

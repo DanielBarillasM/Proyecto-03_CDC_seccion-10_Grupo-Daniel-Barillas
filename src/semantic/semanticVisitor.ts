@@ -78,6 +78,7 @@ import {
   isAbsorbing,
   isArrayType,
   isFunctionType,
+  typesEqual,
   type SemanticType
 } from "./semanticTypes";
 import {
@@ -196,7 +197,63 @@ class SemanticAnalyzer extends AbstractParseTreeVisitor<SemanticTreeNode> implem
     // La entrada pasa por el visitor real generado por ANTLR. De esta forma
     // la fase cumple el contrato Listener/Visitor del proyecto sin mantener
     // un parser semántico paralelo.
-    return program.accept(this).children;
+    const tree = program.accept(this).children;
+    this.validateInheritanceContracts();
+    return tree;
+  }
+
+  /** Valida al final las firmas que comparten ABI en una vtable. */
+  private validateInheritanceContracts(): void {
+    for (const info of this.classRegistry.byId.values()) {
+      if (!info.parent) continue;
+
+      for (const method of info.methods.values()) {
+        if (method.name === "constructor") {
+          const parentConstructor = lookupMethod(this.classRegistry.byId, info.parent.id, "constructor");
+          if (!parentConstructor) continue;
+          if (method.params.length < parentConstructor.params.length) {
+            this.report(
+              "SEM006",
+              "error",
+              method.declaration,
+              `El constructor de '${info.name}' debe recibir al menos ${parentConstructor.params.length} argumento(s) para inicializar '${info.parent.name}'.`,
+              { symbol: method.name }
+            );
+            continue;
+          }
+          parentConstructor.params.forEach((parentParameter, index) => {
+            const childParameter = method.params[index];
+            if (!typesEqual(childParameter.type, parentParameter.type)) {
+              this.report(
+                "SEM007",
+                "error",
+                method.declaration,
+                `El parámetro ${index + 1} del constructor de '${info.name}' debe ser '${displayType(parentParameter.type)}' para reenviarlo a '${info.parent!.name}', no '${displayType(childParameter.type)}'.`,
+                { symbol: childParameter.name }
+              );
+            }
+          });
+          continue;
+        }
+
+        const inherited = lookupMethod(this.classRegistry.byId, info.parent.id, method.name);
+        if (!inherited) continue;
+        const sameParameters = method.params.length === inherited.params.length &&
+          method.params.every((parameter, index) => typesEqual(parameter.type, inherited.params[index].type));
+        const sameReturn = typesEqual(method.returnType, inherited.returnType);
+        if (!sameParameters || !sameReturn) {
+          const inheritedSignature = `(${inherited.params.map((parameter) => displayType(parameter.type)).join(", ")}) -> ${displayType(inherited.returnType)}`;
+          const childSignature = `(${method.params.map((parameter) => displayType(parameter.type)).join(", ")}) -> ${displayType(method.returnType)}`;
+          this.report(
+            "SEM007",
+            "error",
+            method.declaration,
+            `La sobrescritura de '${method.name}' en '${info.name}' debe conservar la firma heredada ${inheritedSignature}; se encontró ${childSignature}.`,
+            { symbol: method.name }
+          );
+        }
+      }
+    }
   }
 
   public visitProgram(ctx: ProgramContext): SemanticTreeNode {

@@ -640,7 +640,7 @@ Resultado esperado de la versión documentada:
 ```text
 TypeScript: aprobado
 Archivos de prueba: 15 aprobados
-Pruebas: 232 aprobadas
+Pruebas: 235 aprobadas
 Ejecuciones MARS incluidas: 41
 Build de producción: aprobado
 ```
@@ -666,5 +666,5 @@ La entrega puede considerarse lista cuando:
 - E06 termina de forma controlada sin una excepción interna de MARS;
 - R01 produce un diagnóstico normal sin bloquear la aplicación;
 - I01 demuestra selección de archivo y resultados dentro de la GUI;
-- la suite completa aprueba 232 pruebas, incluidas las 41 ejecuciones MARS;
+- la suite completa aprueba 235 pruebas, incluidas las 42 ejecuciones MARS;
 - el build termina correctamente y la auditoría informa cero vulnerabilidades.

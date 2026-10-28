@@ -138,7 +138,15 @@ Aunque algunos fragmentos del README oficial omiten llaves, la gramática ANTLR 
 
 Las modificaciones posteriores a una declaración se realizan mediante `ScopeManager.updateSymbol`. Esta operación mantiene invariantes de identidad: no permite reemplazar el ID, nombre, ámbito ni posición declarada. Inicialización, captura, tipo inferido, firma y referencias pueden actualizarse sin reconstruir el símbolo.
 
-## 19. Fuente de verdad
+## 19. Contratos de herencia ejecutables
+
+Una sobrescritura conserva el slot de la vtable del método heredado. Por ello debe conservar exactamente la cantidad y los tipos de sus parámetros, además del tipo de retorno; una firma incompatible produce `SEM007` y bloquea TAC/MIPS. La comprobación se realiza después de inferir todos los retornos, incluso cuando una clase hija aparece antes que su clase padre.
+
+Como la gramática no define `super(...)`, el backend encadena constructores reenviando al padre el prefijo de parámetros del constructor hijo. Ese prefijo debe tener al menos la aridad del constructor padre y tipos idénticos; de lo contrario se reportan `SEM006` o `SEM007` antes de generar código.
+
+Los campos homónimos sí conservan almacenamiento separado. Un acceso con tipo hijo selecciona el campo más derivado, mientras que un método heredado continúa usando el layout de su clase declaradora.
+
+## 20. Fuente de verdad
 
 La gramática activa del proyecto está en:
 

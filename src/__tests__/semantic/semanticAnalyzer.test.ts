@@ -606,4 +606,30 @@ describe("Análisis semántico — ámbitos de clases e inferencia", () => {
     ]));
     expect(result.accepted).toBe(false);
   });
+
+  it("rechaza sobrescrituras cuya firma rompería el slot heredado de la vtable", () => {
+    const result = analyze(`
+      class Hija: Base {
+        function valor(): float { return 2.5; }
+      }
+      class Base {
+        function valor(x: integer): integer { return x; }
+      }
+    `);
+    expect(result.semantic.errors.some(({ code, message }) => code === "SEM007" && message.includes("firma heredada"))).toBe(true);
+  });
+
+  it("valida el reenvío de argumentos desde el constructor hijo al padre", () => {
+    const missing = analyze(`
+      class Base { function constructor(x: integer) { } }
+      class Hija: Base { function constructor() { } }
+    `);
+    expect(missing.semantic.errors.some(({ code }) => code === "SEM006")).toBe(true);
+
+    const incompatible = analyze(`
+      class Base { function constructor(x: float) { } }
+      class Hija: Base { function constructor(x: string) { } }
+    `);
+    expect(incompatible.semantic.errors.some(({ code }) => code === "SEM007")).toBe(true);
+  });
 });

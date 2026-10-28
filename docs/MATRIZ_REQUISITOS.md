@@ -18,7 +18,7 @@ Esta matriz relaciona las instrucciones de generación de código ensamblador co
 | Evitar duplicados/ciclos/cascadas | normalización, deduplicación y fases bloqueadas | `analyze.ts`, tests | Cubierto |
 | No TAC/MIPS con errores previos | `skipped` y ensamblador vacío | prueba "bloquea TAC y MIPS" | Cubierto |
 | Optimización de mirilla | cuatro reglas locales conservadoras | `peepholeOptimize`, prueba unitaria | Cubierto |
-| Ensamblador válido | segmentos, etiquetas y opcodes MIPS32 | 41 ejecuciones MARS | Cubierto |
+| Ensamblador válido | segmentos, etiquetas y opcodes MIPS32 | 42 ejecuciones MARS | Cubierto |
 | Ejecución con herramienta externa | runner Java configurable | `scripts/run-mars.mjs` | Cubierto |
 | No ejecución interna requerida | UI genera/exporta; MARS es externo | diseño y documentación | Cubierto |
 
@@ -60,10 +60,10 @@ Esta matriz relaciona las instrucciones de generación de código ensamblador co
 | Control | Resultado verificado |
 | --- | --- |
 | `npm run check` | aprobado |
-| `npm test` | 232 aprobadas en 15 archivos, incluidas 41 ejecuciones MARS |
+| `npm test` | 235 aprobadas en 15 archivos, incluidas 42 ejecuciones MARS |
 | `npm run build` | aprobado |
 | dependencias completas | 0 vulnerabilidades en `npm audit` |
-| MARS 4.5 | 41 casos aprobados; CI los exige con Java 17 |
+| MARS 4.5 | 42 casos aprobados; CI los exige con Java 17 |
 | errores previos | TAC/MIPS omitidos |
 | backend inconsistente | estado `failed`, descarga deshabilitada |
 
