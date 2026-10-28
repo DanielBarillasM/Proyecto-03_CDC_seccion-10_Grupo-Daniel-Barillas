@@ -6,12 +6,12 @@
 
 Compilador visual de Compiscript que recorre el frontend completo, genera TAC y lo traduce a ensamblador MIPS32 ejecutable en MARS 4.5.
 
-[![Proyecto](https://img.shields.io/badge/Proyecto-03-FFD426?style=for-the-badge&labelColor=111111)](#)
-[![Versión](https://img.shields.io/badge/versi%C3%B3n-3.0.0-FFD426?style=for-the-badge&labelColor=111111)](package.json)
-[![ANTLR](https://img.shields.io/badge/ANTLR-4-FFD426?style=for-the-badge&labelColor=111111)](https://www.antlr.org/)
-[![MIPS](https://img.shields.io/badge/MIPS32-MARS%204.5-FFD426?style=for-the-badge&labelColor=111111)](https://dpetersanderson.github.io/)
-[![Tests](https://img.shields.io/badge/tests-Vitest%20%2B%20MARS-32D583?style=for-the-badge&labelColor=111111)](#calidad-y-validación)
-[![License](https://img.shields.io/badge/license-MIT-FFD426?style=for-the-badge&labelColor=111111)](LICENSE)
+[![Proyecto](https://img.shields.io/badge/Proyecto-03-8B7CFF?style=for-the-badge&labelColor=060811)](#)
+[![Versión](https://img.shields.io/badge/versi%C3%B3n-3.0.0-8B7CFF?style=for-the-badge&labelColor=060811)](package.json)
+[![ANTLR](https://img.shields.io/badge/ANTLR-4-2077FF?style=for-the-badge&labelColor=060811)](https://www.antlr.org/)
+[![MIPS](https://img.shields.io/badge/MIPS32-MARS%204.5-21D4C3?style=for-the-badge&labelColor=060811)](https://dpetersanderson.github.io/)
+[![Tests](https://img.shields.io/badge/tests-Vitest%20%2B%20MARS-56E0D3?style=for-the-badge&labelColor=060811)](#calidad-y-validación)
+[![License](https://img.shields.io/badge/license-MIT-8B7CFF?style=for-the-badge&labelColor=060811)](LICENSE)
 
 ![Pipeline del Proyecto 3](docs/assets/compiscript-project3-pipeline.png)
 

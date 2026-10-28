@@ -1,6 +1,6 @@
 # Auditoría técnica del Proyecto 3
 
-**Fecha:** 27 de octubre de 2026
+**Fecha:** 28 de octubre de 2026
 **Versión revisada:** 3.0.0  
 **Objetivo:** generación de ensamblador MIPS32 desde el TAC del Proyecto 2.
 
@@ -8,7 +8,7 @@
 
 La implementación cubre el pipeline obligatorio y el caso que originó la revisión quedó corregido: una entrada válida o un archivo propio ejecuta el modo `mips`; si frontend y TAC terminan correctamente, la UI genera ensamblador y habilita su descarga. Si existe un error previo, MIPS queda en `skipped` y no se produce artefacto.
 
-La suite contiene **41 casos de ejecución MARS** para enteros, floats, cadenas, funciones, llamadas anidadas, recursión, arreglos, matrices, objetos, herencia, métodos, despacho dinámico, constructores heredados, closures, errores de ejecución y `try/catch`. El workflow instala Java y exige la ejecución MARS; en una máquina sin Java o sin el JAR, Vitest los omite explícitamente en vez de reportar un falso positivo.
+La suite contiene **41 casos de ejecución MARS** para enteros, floats, cadenas, funciones, llamadas anidadas, recursión, arreglos, objetos, herencia, métodos, despacho dinámico, constructores heredados, closures, errores de ejecución y `try/catch`. Las matrices se validan mediante el caso manual reproducible de la guía completa de pruebas. El workflow instala Java y exige la ejecución MARS; en una máquina sin Java o sin el JAR, Vitest los omite explícitamente en vez de reportar un falso positivo.
 
 ## Problemas corregidos
 
@@ -36,6 +36,7 @@ La suite contiene **41 casos de ejecución MARS** para enteros, floats, cadenas,
 | Alta | División o módulo entre cero producía un resultado silencioso | Validación entera y flotante con excepción de runtime capturable |
 | Alta | Una llamada mediante una referencia base ignoraba la sobrescritura de la clase real | Vtables con slots estables y despacho dinámico mediante `jalr` |
 | Alta | Arreglos de instancias se trataban como covariantes pese a ser mutables | Asignabilidad invariante para impedir escrituras incompatibles |
+| Alta | El backend resolvía símbolos homónimos por nombre y el `shadowing` podía sobrescribir el slot exterior | Resolución de slots exclusivamente por `symbolId` y regresión MARS que comprueba las salidas `2`, `1` |
 | Media | Anidamiento sintáctico extremo podía agotar la pila de JavaScript | Límite estructural previo al parser con diagnóstico único y bloqueo de fases posteriores |
 | Media | Variables locales sin inicializador dependían del contenido residual de la pila | Inicialización determinista a cero en el prólogo de cada función |
 
