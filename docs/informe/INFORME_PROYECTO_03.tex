@@ -37,8 +37,8 @@
 \newcommand{\concepto}[1]{\textcolor{violetaoscuro}{\textbf{#1}}}
 \newenvironment{destacado}{\begin{center}\begin{minipage}{0.93\textwidth}\color{tinta}\setlength{\parskip}{0.35em}}{\end{minipage}\end{center}}
 \makeatletter
-\renewcommand{\@makechapterhead}[1]{\vspace*{-12pt}{\color{violeta}\rule{1.1cm}{4pt}}\par\vspace{12pt}{\Large\color{muted}\sffamily\bfseries CAPÍTULO \thechapter}\par\vspace{5pt}{\Huge\color{tinta}\sffamily\bfseries #1}\par\vspace{12pt}{\color{borde}\hrule}\vspace{24pt}}
-\renewcommand{\@makeschapterhead}[1]{\vspace*{-12pt}{\color{violeta}\rule{1.1cm}{4pt}}\par\vspace{12pt}{\Huge\color{tinta}\sffamily\bfseries #1}\par\vspace{12pt}{\color{borde}\hrule}\vspace{24pt}}
+\renewcommand{\@makechapterhead}[1]{\vspace*{50pt}{\color{violeta}\rule{1.1cm}{4pt}}\par\nobreak\vspace{12pt}{\Large\color{muted}\sffamily\bfseries CAPÍTULO \thechapter}\par\nobreak\vspace{5pt}{\Huge\color{tinta}\sffamily\bfseries #1}\par\nobreak\vspace{12pt}{\color{borde}\hrule}\par\nobreak\vspace{24pt}}
+\renewcommand{\@makeschapterhead}[1]{\vspace*{50pt}{\color{violeta}\rule{1.1cm}{4pt}}\par\nobreak\vspace{12pt}{\Huge\color{tinta}\sffamily\bfseries #1}\par\nobreak\vspace{12pt}{\color{borde}\hrule}\par\nobreak\vspace{24pt}}
 \makeatother
 
 \begin{document}
@@ -86,9 +86,9 @@ El Proyecto 3 completa un compilador educativo para Compiscript. Conserva el lex
 
 El producto se presenta como una interfaz gr\'afica React con editor Monaco. El usuario puede escribir o seleccionar un archivo \archivo{.cps}, ejecutar el pipeline, observar diagn\'osticos y examinar tokens, CST, \'arbol sem\'antico, s\'imbolos, \'ambitos, TAC, bloques b\'asicos, registros de activaci\'on y ensamblador. La exportaci\'on MIPS se habilita solamente cuando todas las fases terminan correctamente.
 
-El backend implementa convenci\'on de llamadas mediante pila, asignaci\'on local de registros, aritm\'etica entera y flotante, control de flujo, funciones, llamadas anidadas, recursi\'on, arreglos, objetos, m\'etodos con despacho din\'amico, strings, closures y recuperaci\'on de errores de ejecuci\'on mediante \codigo{try/catch}. La suite define 41 casos de ejecuci\'on MARS y el workflow los exige con Java 17.
+El backend implementa convenci\'on de llamadas mediante pila, asignaci\'on local de registros, aritm\'etica entera y flotante, control de flujo, funciones, llamadas anidadas, recursi\'on, arreglos, objetos, m\'etodos con despacho din\'amico, strings, closures y recuperaci\'on de errores de ejecuci\'on mediante \codigo{try/catch}. La suite define 42 casos de ejecuci\'on MARS y el workflow los exige con Java 17.
 
-El resultado no es solamente un traductor de ejemplos aislados. Es un pipeline verificable con contratos entre fases, bloqueo seguro ante entradas inv\'alidas, diagn\'osticos acumulativos y evidencia reproducible. La versi\'on documentada contiene 232 pruebas automatizadas en 15 archivos: 191 verificaciones que no requieren herramientas externas y 41 ejecuciones reales del ensamblador generado en MARS 4.5. El informe explica las decisiones que permiten sostener esa compatibilidad, los riesgos que se corrigieron y la relaci\'on entre cada requisito y su evidencia.
+El resultado no es solamente un traductor de ejemplos aislados. Es un pipeline verificable con contratos entre fases, bloqueo seguro ante entradas inv\'alidas, diagn\'osticos acumulativos y evidencia reproducible. La versi\'on documentada contiene 235 pruebas automatizadas en 15 archivos: 193 verificaciones que no requieren herramientas externas y 42 ejecuciones reales del ensamblador generado en MARS 4.5. El informe explica las decisiones que permiten sostener esa compatibilidad, los riesgos que se corrigieron y la relaci\'on entre cada requisito y su evidencia.
 
 \begin{destacado}
 \textbf{Resultado principal.} Un archivo Compiscript v\'alido puede seleccionarse en la interfaz, recorrer lexer, parser, sem\'antica y TAC, producir MIPS32, descargarse como \archivo{.asm} y ejecutarse externamente en MARS. Si aparece un error l\'exico, sint\'actico o sem\'antico, las fases TAC y MIPS quedan omitidas y no se habilita una exportaci\'on potencialmente incorrecta.
@@ -396,7 +396,7 @@ El valor de retorno entero, booleano, string o referencia se coloca en \codigo{\
 
 La limpieza exacta es indispensable para llamadas anidadas. Cuando \codigo{sumar} recibe los resultados de dos llamadas a \codigo{multiplicar}, el primer argumento ya calculado debe permanecer disponible mientras se ejecuta la segunda llamada interna. Limpiar toda la zona de argumentos producir\'ia un resultado incorrecto aunque cada funci\'on aislada pareciera funcionar.
 
-Los m\'etodos reciben el objeto receptor como primer par\'ametro impl\'icito. Los constructores siguen la misma convenci\'on, pero retornan el receptor inicializado. En herencia, el constructor hijo invoca primero al constructor padre compatible y despu\'es inicializa sus propios campos.
+Los m\'etodos reciben el objeto receptor como primer par\'ametro impl\'icito. Los constructores siguen la misma convenci\'on, pero retornan el receptor inicializado. En herencia, el constructor hijo invoca primero al constructor padre compatible y despu\'es inicializa sus propios campos. Como Compiscript no define \codigo{super(...)}, el constructor hijo debe ofrecer un prefijo de par\'ametros con la aridad y los tipos exactos requeridos por el padre. La fase sem\'antica reporta \codigo{SEM006} o \codigo{SEM007} antes de generar TAC si ese contrato no se cumple.
 
 \section{Arreglos y matrices}
 
@@ -408,7 +408,9 @@ Una matriz no requiere un formato adicional: es un arreglo cuyos elementos son p
 
 Los objetos reservan \codigo{ClassLayout.instanceSize}; el primer word apunta a la vtable de la clase real y los campos usan offsets calculados en TAC. Un layout hijo incorpora los campos heredados antes de agregar los propios, de modo que un m\'etodo base mantiene offsets v\'alidos cuando recibe una instancia hija.
 
-Cada m\'etodo ocupa un slot estable. Si una clase hija sobrescribe un m\'etodo, conserva el slot y reemplaza la direcci\'on en su vtable. Una llamada mediante una referencia base carga la vtable del objeto, selecciona el slot y ejecuta \codigo{jalr}; por eso se invoca el m\'etodo de la clase real, no el que sugiere solamente el tipo est\'atico.
+Cada m\'etodo ocupa un slot estable. Si una clase hija sobrescribe un m\'etodo, conserva el slot y reemplaza la direcci\'on en su vtable. Para que ese slot mantenga un ABI coherente, la sobrescritura debe conservar cantidad y tipos de par\'ametros, adem\'as del tipo de retorno. La comprobaci\'on ocurre despu\'es de inferir retornos, incluso cuando la clase hija aparece antes que la clase padre. Una llamada mediante una referencia base carga la vtable del objeto, selecciona el slot y ejecuta \codigo{jalr}; por eso se invoca el m\'etodo de la clase real, no el que sugiere solamente el tipo est\'atico.
+
+Los campos hom\'onimos de padre e hija conservan slots de memoria distintos. Un acceso tipado como la clase hija selecciona el campo m\'as derivado, mientras un m\'etodo heredado contin\'ua usando el layout de su clase declaradora. Esta regla evita que el inicializador hijo sobrescriba por accidente el almacenamiento del campo padre.
 
 Antes de leer o escribir un campo se comprueba que el receptor no sea \codigo{null}. Si existe un handler activo, el error se transfiere al \codigo{catch}; de lo contrario, el runtime imprime el mensaje y termina de forma controlada, sin provocar una excepci\'on interna de MARS.
 
@@ -677,17 +679,17 @@ Build/auditor\'ia & tipado, empaquetado y dependencias & importar un m\'odulo in
 \bottomrule
 \end{longtable}
 
-Cada correcci\'on de alto impacto incorpora una regresi\'on. Por ejemplo, el despacho din\'amico se verifica con una referencia base que contiene una instancia hija; el \emph{shadowing} imprime los valores interior y exterior; y la limpieza de argumentos se ejercita con llamadas anidadas. Esta pr\'actica evita que una mejora posterior reintroduzca un defecto ya resuelto.
+Cada correcci\'on de alto impacto incorpora una regresi\'on. Por ejemplo, el despacho din\'amico se verifica con una referencia base que contiene una instancia hija; el \emph{shadowing} imprime los valores interior y exterior; la limpieza de argumentos se ejercita con llamadas anidadas; y un objeto con campos hom\'onimos comprueba que padre e hija conserven offsets independientes. Esta pr\'actica evita que una mejora posterior reintroduzca un defecto ya resuelto.
 
 \section{Suite automatizada}
 
-La suite final contiene 232 casos en 15 archivos: 191 se ejecutan sin herramientas externas y 41 validan la salida real en MARS cuando Java y el JAR est\'an disponibles. Las pruebas del backend verifican generaci\'on completa, convenci\'on de pila, arreglos, runtime de strings, llamadas anidadas, closures, despacho din\'amico, constructores heredados, errores de objeto nulo y divisi\'on entre cero, recuperaci\'on de \texttt{try/catch}, bloqueo por errores y mirilla. Las pruebas heredadas contin\'uan verificando lexer, parser, sem\'antica, s\'imbolos, TAC, CFG, UI y la exportaci\'on del modo MIPS.
+La suite final contiene 235 casos en 15 archivos: 193 se ejecutan sin herramientas externas y 42 validan la salida real en MARS cuando Java y el JAR est\'an disponibles. Las pruebas del backend verifican generaci\'on completa, convenci\'on de pila, arreglos, runtime de strings, llamadas anidadas, closures, despacho din\'amico, constructores heredados, contratos de sobrescritura, campos hom\'onimos, errores de objeto nulo y divisi\'on entre cero, recuperaci\'on de \texttt{try/catch}, bloqueo por errores y mirilla. Las pruebas heredadas contin\'uan verificando lexer, parser, sem\'antica, s\'imbolos, TAC, CFG, UI y la exportaci\'on del modo MIPS.
 
-Los 191 casos independientes de herramientas externas permiten obtener retroalimentaci\'on incluso si MARS no est\'a instalado. Sin embargo, no se confunden con ejecuci\'on de ensamblador: cuando \codigo{REQUIRE\_MARS=1}, la ausencia de Java o del JAR hace fallar la suite en lugar de omitir silenciosamente los 41 escenarios.
+Los 193 casos independientes de herramientas externas permiten obtener retroalimentaci\'on incluso si MARS no est\'a instalado. Sin embargo, no se confunden con ejecuci\'on de ensamblador: cuando \codigo{REQUIRE\_MARS=1}, la ausencia de Java o del JAR hace fallar la suite en lugar de omitir silenciosamente los 42 escenarios.
 
 \section{Validaci\'on real en MARS}
 
-La suite de integraci\'on contiene 41 escenarios MARS, incluidos resultados positivos, errores de arreglos y objetos, divisi\'on entre cero, despacho din\'amico, constructores heredados y capturas mediante \codigo{try/catch}. El workflow instala Java 17, prepara MARS 4.5 y exige todos los escenarios. Algunos resultados representativos son:
+La suite de integraci\'on contiene 42 escenarios MARS, incluidos resultados positivos, errores de arreglos y objetos, divisi\'on entre cero, despacho din\'amico, constructores heredados, campos hom\'onimos y capturas mediante \codigo{try/catch}. El workflow instala Java 17, prepara MARS 4.5 y exige todos los escenarios. Algunos resultados representativos son:
 
 \begin{longtable}{p{7cm}p{5cm}}
 \toprule
@@ -702,6 +704,7 @@ closure & 1\\
 clase, m\'etodo y llamada anidada & 2; 6; 12\\
 shadowing de bloque & 2; 1\\
 despacho din\'amico & Toby ladra\\
+campos hom\'onimos en padre e hija & 1; 2.5; 2.5\\
 divisi\'on entre cero capturada & mensaje de runtime y continuaci\'on\\
 \bottomrule
 \end{longtable}
@@ -740,7 +743,7 @@ npm run cli:mips
 npm audit
 \end{verbatim}
 
-TypeScript, 191 pruebas independientes de herramientas externas y el build terminan correctamente; los 41 escenarios MARS tambi\'en fueron ejecutados y son obligatorios en CI. La auditor\'ia completa de dependencias reporta cero vulnerabilidades.
+TypeScript, 193 pruebas independientes de herramientas externas y el build terminan correctamente; los 42 escenarios MARS tambi\'en fueron ejecutados y son obligatorios en CI. La auditor\'ia completa de dependencias reporta cero vulnerabilidades.
 
 \section{Interpretaci\'on de resultados}
 
@@ -767,7 +770,7 @@ Resultados dentro de GUI & Cumple & paneles de fases, TAC y MIPS\\
 M\'ultiples errores y recuperaci\'on & Cumple & listeners, estrategia ANTLR y visitors\\
 No TAC/MIPS ante errores & Cumple & estados y pruebas negativas\\
 Mirilla & Cumple & optimizador y m\'etricas\\
-Ensamblador ejecutable & Cumple & 41 escenarios MARS aprobados y exigidos en CI\\
+Ensamblador ejecutable & Cumple & 42 escenarios MARS aprobados y exigidos en CI\\
 Casos de prueba propios & Cumple & ejemplos MIPS, TAC, sem\'anticos y de r\'ubrica\\
 Evitar cascadas y ciclos & Cumple & normalizaci\'on, l\'imites y regresiones de recuperaci\'on\\
 Arquitectura destino documentada & Cumple & MIPS32, MARS, frames, heap y syscalls\\
@@ -824,7 +827,7 @@ Archivo & Responsabilidad\\\midrule
 \archivo{src/cli/run.ts} & modo MIPS y escritura \archivo{.asm}\\
 \archivo{scripts/run-mars.mjs} & invocaci\'on externa de MARS\\
 \archivo{src/__tests__/mips.test.ts} & regresiones del backend\\
-\archivo{src/__tests__/mips.execution.test.ts} & 41 ejecuciones reales en MARS\\
+\archivo{src/__tests__/mips.execution.test.ts} & 42 ejecuciones reales en MARS\\
 \archivo{examples/mips} & demostraciones y caso de bloqueo\\
 \archivo{docs/GUIA_PRUEBAS_COMPLETA.md} & casos manuales y resultados esperados\\
 \archivo{docs/MATRIZ_REQUISITOS.md} & trazabilidad detallada de la r\'ubrica\\
@@ -877,7 +880,7 @@ npm.cmd run verify
 npm.cmd audit --audit-level=moderate
 \end{verbatim}
 
-El resultado documentado es: 15 archivos de prueba, 232 pruebas aprobadas, 41 ejecuciones MARS incluidas, build de producci\'on aprobado y cero vulnerabilidades reportadas.
+El resultado documentado es: 15 archivos de prueba, 235 pruebas aprobadas, 42 ejecuciones MARS incluidas, build de producci\'on aprobado y cero vulnerabilidades reportadas.
 
 \section{Generaci\'on y ejecuci\'on manual}
 
