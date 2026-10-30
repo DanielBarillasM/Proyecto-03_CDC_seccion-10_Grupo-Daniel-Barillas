@@ -1321,6 +1321,7 @@ class SemanticAnalyzer extends AbstractParseTreeVisitor<SemanticTreeNode> implem
         return { type: T.error, node: createSemanticNode("this", "this", { location: loc, inferredType: "error" }) };
       }
       this.scopes.addReference(symbol.id, loc);
+      this.markCaptureIfNeeded(symbol);
       return { type: symbol.type, node: createSemanticNode("this", "this", { location: loc, inferredType: displayType(symbol.type) }), symbol };
     }
 

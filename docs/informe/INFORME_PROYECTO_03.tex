@@ -86,9 +86,9 @@ El Proyecto 3 completa un compilador educativo para Compiscript. Conserva el lex
 
 El producto se presenta como una interfaz gr\'afica React con editor Monaco. El usuario puede escribir o seleccionar un archivo \archivo{.cps}, ejecutar el pipeline, observar diagn\'osticos y examinar tokens, CST, \'arbol sem\'antico, s\'imbolos, \'ambitos, TAC, bloques b\'asicos, registros de activaci\'on y ensamblador. La exportaci\'on MIPS se habilita solamente cuando todas las fases terminan correctamente.
 
-El backend implementa convenci\'on de llamadas mediante pila, asignaci\'on local de registros, aritm\'etica entera y flotante, control de flujo, funciones, llamadas anidadas, recursi\'on, arreglos, objetos, m\'etodos con despacho din\'amico, strings, closures y recuperaci\'on de errores de ejecuci\'on mediante \codigo{try/catch}. La suite define 52 casos de ejecuci\'on MARS y el workflow los exige con Java 17.
+El backend implementa convenci\'on de llamadas mediante pila, asignaci\'on local de registros, aritm\'etica entera y flotante, control de flujo, funciones, llamadas anidadas, recursi\'on, arreglos, objetos, m\'etodos con despacho din\'amico, strings, closures y recuperaci\'on de errores de ejecuci\'on mediante \codigo{try/catch}. La suite define 64 casos de ejecuci\'on MARS y el workflow los exige con Java 17.
 
-El resultado no es solamente un traductor de ejemplos aislados. Es un pipeline verificable con contratos entre fases, bloqueo seguro ante entradas inv\'alidas, diagn\'osticos acumulativos y evidencia reproducible. La versi\'on documentada contiene 261 pruebas automatizadas en 17 archivos: 209 verificaciones que no requieren herramientas externas y 52 ejecuciones reales del ensamblador generado en MARS 4.5. El informe explica las decisiones que permiten sostener esa compatibilidad, los riesgos que se corrigieron y la relaci\'on entre cada requisito y su evidencia.
+El resultado no es solamente un traductor de ejemplos aislados. Es un pipeline verificable con contratos entre fases, bloqueo seguro ante entradas inv\'alidas, diagn\'osticos acumulativos y evidencia reproducible. La versi\'on documentada contiene 278 pruebas automatizadas en 18 archivos: 214 verificaciones que no requieren herramientas externas y 64 ejecuciones reales del ensamblador generado en MARS 4.5. El informe explica las decisiones que permiten sostener esa compatibilidad, los riesgos que se corrigieron y la relaci\'on entre cada requisito y su evidencia.
 
 \begin{destacado}
 \textbf{Resultado principal.} Un archivo Compiscript v\'alido puede seleccionarse en la interfaz, recorrer lexer, parser, sem\'antica y TAC, producir MIPS32, descargarse como \archivo{.asm} y ejecutarse externamente en MARS. Si aparece un error l\'exico, sint\'actico o sem\'antico, las fases TAC y MIPS quedan omitidas y no se habilita una exportaci\'on potencialmente incorrecta.
@@ -420,6 +420,8 @@ Un valor funci\'on se representa mediante un descriptor. El primer word contiene
 
 Al invocar el descriptor, \codigo{\$s7} apunta al entorno activo. \codigo{LOAD\_CAPTURE} y \codigo{STORE\_CAPTURE} acceden a la celda compartida, no a una copia. Por eso dos llamadas al contador creado por una funci\'on anidada observan y modifican el mismo estado aun despu\'es de que la funci\'on creadora retorn\'o.
 
+El receptor impl\'icito \codigo{this} sigue la misma regla. Si una funci\'on anidada dentro de un m\'etodo lo referencia, la fase sem\'antica marca el s\'imbolo como captura antes de generar TAC. El entorno conserva as\'i el receptor incluso despu\'es de que el m\'etodo creador haya retornado. La tercera auditor\'ia incorpor\'o una regresi\'on que devuelve ese closure, lo invoca posteriormente y comprueba la salida \codigo{12}; esta prueba evita el diagn\'ostico de backend \codigo{MIPS040} que aparec\'ia antes de registrar la captura.
+
 \section{Strings y flotantes}
 
 Las cadenas constantes se internan para evitar duplicados. La concatenaci\'on solicita memoria y copia bytes; la igualdad compara byte a byte. Los flotantes usan instrucciones \codigo{l.s}, \codigo{s.s}, \codigo{add.s}, \codigo{sub.s}, \codigo{mul.s} y \codigo{div.s}. La promoci\'on entera se realiza con \codigo{mtc1} y \codigo{cvt.s.w}.
@@ -453,7 +455,7 @@ Dos \codigo{nop} consecutivos & Se conserva uno y se elimina la redundancia loca
 \bottomrule
 \end{longtable}
 
-Se conserva la salida previa para auditor\'ia y se informa cu\'antas instrucciones se removieron, tanto en total como por regla. Las reglas no reordenan accesos a memoria, llamadas ni ramas condicionales. La suite dedicada prueba cada transformaci\'on, falsos positivos, idempotencia, inmutabilidad de la entrada y acumulaci\'on de m\'etricas; las 52 ejecuciones MARS verifican que el ensamblador optimizado mantiene las salidas observables.
+Se conserva la salida previa para auditor\'ia y se informa cu\'antas instrucciones se removieron, tanto en total como por regla. Las reglas no reordenan accesos a memoria, llamadas ni ramas condicionales. La suite dedicada prueba cada transformaci\'on, falsos positivos, idempotencia, inmutabilidad de la entrada y acumulaci\'on de m\'etricas; las 64 ejecuciones MARS verifican que el ensamblador optimizado mantiene las salidas observables.
 
 \section{Validaci\'on del ensamblador generado}
 
@@ -698,13 +700,13 @@ Cada correcci\'on de alto impacto incorpora una regresi\'on. Por ejemplo, el des
 
 \section{Suite automatizada}
 
-La suite final contiene 261 casos en 17 archivos: 209 se ejecutan sin herramientas externas y 52 validan la salida real en MARS cuando Java y el JAR est\'an disponibles. Las pruebas del backend verifican generaci\'on completa, convenci\'on de pila, arreglos, runtime de strings, llamadas anidadas, closures, despacho din\'amico, constructores heredados, contratos de sobrescritura, campos hom\'onimos, errores de objeto nulo y divisi\'on entre cero, recuperaci\'on de \texttt{try/catch} y bloqueo por errores. La suite \archivo{peephole.test.ts} a\~nade regresiones aisladas para las ocho reglas, falsos positivos, idempotencia, inmutabilidad y m\'etricas. La segunda auditor\'ia en \archivo{second.audit.test.ts} agrega 13 contratos sobre bloqueo de fases, determinismo, estructura de frames y diez salidas MARS: cortocircuito l\'ogico, recursi\'on mutua, seis par\'ametros con llamadas anidadas, aislamiento de locales recursivos, control de flujo, matrices, continuaci\'on tras \codigo{catch}, retorno desde \codigo{try} y presi\'on de registros. Las pruebas heredadas contin\'uan verificando lexer, parser, sem\'antica, s\'imbolos, TAC, CFG, UI y la exportaci\'on del modo MIPS.
+La suite final contiene 278 casos en 18 archivos: 214 se ejecutan sin herramientas externas y 64 validan la salida real en MARS cuando Java y el JAR est\'an disponibles. Las pruebas del backend verifican generaci\'on completa, convenci\'on de pila, arreglos, runtime de strings, llamadas anidadas, closures, despacho din\'amico, constructores heredados, contratos de sobrescritura, campos hom\'onimos, errores de objeto nulo y divisi\'on entre cero, recuperaci\'on de \texttt{try/catch} y bloqueo por errores. La suite \archivo{peephole.test.ts} a\~nade regresiones aisladas para las ocho reglas, falsos positivos, idempotencia, inmutabilidad y m\'etricas. La segunda auditor\'ia en \archivo{second.audit.test.ts} agrega 13 contratos sobre bloqueo de fases, determinismo, estructura de frames y diez salidas MARS: cortocircuito l\'ogico, recursi\'on mutua, seis par\'ametros con llamadas anidadas, aislamiento de locales recursivos, control de flujo, matrices, continuaci\'on tras \codigo{catch}, retorno desde \codigo{try} y presi\'on de registros. La tercera auditor\'ia en \archivo{third.audit.test.ts} agrega 17 contratos, de los cuales 12 ejecutan MARS: estructura ac\'iclica y alineada de activation records, estad\'isticas de \codigo{getReg}, ocho reglas de mirilla, bloqueo por varios errores, captura de \codigo{this}, aritm\'etica con signo, cortocircuito con efectos laterales, \codigo{for(;;)}, \codigo{switch}, recursi\'on ramificada, herencia de tres niveles, handlers anidados, alias de arreglos de strings y retornos float. Las pruebas heredadas contin\'uan verificando lexer, parser, sem\'antica, s\'imbolos, TAC, CFG, UI y la exportaci\'on del modo MIPS.
 
-Los 209 casos independientes de herramientas externas permiten obtener retroalimentaci\'on incluso si MARS no est\'a instalado. Sin embargo, no se confunden con ejecuci\'on de ensamblador: cuando \codigo{REQUIRE\_MARS=1}, la ausencia de Java o del JAR hace fallar la suite en lugar de omitir silenciosamente los 52 escenarios.
+Los 214 casos independientes de herramientas externas permiten obtener retroalimentaci\'on incluso si MARS no est\'a instalado. Sin embargo, no se confunden con ejecuci\'on de ensamblador: cuando \codigo{REQUIRE\_MARS=1}, la ausencia de Java o del JAR hace fallar la suite en lugar de omitir silenciosamente los 64 escenarios.
 
 \section{Validaci\'on real en MARS}
 
-La suite de integraci\'on contiene 52 escenarios MARS, incluidos resultados positivos, errores de arreglos y objetos, divisi\'on entre cero, despacho din\'amico, constructores heredados, campos hom\'onimos y capturas mediante \codigo{try/catch}. La segunda auditor\'ia incorpor\'o los ejemplos documentados de matrices y estructuras de control a esta ejecuci\'on permanente. El workflow instala Java 17, prepara MARS 4.5 y exige todos los escenarios. Algunos resultados representativos son:
+La suite de integraci\'on contiene 64 escenarios MARS, incluidos resultados positivos, errores de arreglos y objetos, divisi\'on entre cero, despacho din\'amico, constructores heredados, campos hom\'onimos y capturas mediante \codigo{try/catch}. La segunda auditor\'ia incorpor\'o los ejemplos documentados de matrices y estructuras de control. La tercera agreg\'o combinaciones de mayor profundidad para recursi\'on, herencia, closures de m\'etodo, handlers y alias. El workflow instala Java 17, prepara MARS 4.5 y exige todos los escenarios. Algunos resultados representativos son:
 
 \begin{longtable}{p{7cm}p{5cm}}
 \toprule
@@ -715,8 +717,12 @@ arreglos y foreach & 6\\
 strings y booleanos & Hola MIPS; true\\
 flotantes & 4.0\\
 factorial recursivo & 120\\
+Fibonacci ramificado & 21\\
 closure & 1\\
+closure de m\'etodo que captura \codigo{this} & 12\\
 clase, m\'etodo y llamada anidada & 2; 6; 12\\
+m\'etodo recursivo & 32\\
+herencia de tres niveles & child; 9\\
 shadowing de bloque & 2; 1\\
 despacho din\'amico & Toby ladra\\
 campos hom\'onimos en padre e hija & 1; 2.5; 2.5\\
@@ -758,7 +764,7 @@ npm run cli:mips
 npm audit
 \end{verbatim}
 
-TypeScript, 209 pruebas independientes de herramientas externas y el build terminan correctamente; los 52 escenarios MARS tambi\'en fueron ejecutados y son obligatorios en CI. La auditor\'ia completa de dependencias reporta cero vulnerabilidades.
+TypeScript, 214 pruebas independientes de herramientas externas y el build terminan correctamente; los 64 escenarios MARS tambi\'en fueron ejecutados y son obligatorios en CI. La auditor\'ia completa de dependencias reporta cero vulnerabilidades.
 
 \section{Interpretaci\'on de resultados}
 
@@ -785,11 +791,38 @@ Resultados dentro de GUI & Cumple & paneles de fases, TAC y MIPS\\
 M\'ultiples errores y recuperaci\'on & Cumple & listeners, estrategia ANTLR y visitors\\
 No TAC/MIPS ante errores & Cumple & estados y pruebas negativas\\
 Mirilla & Cumple & optimizador y m\'etricas\\
-Ensamblador ejecutable & Cumple & 52 escenarios MARS aprobados y exigidos en CI\\
+Ensamblador ejecutable & Cumple & 64 escenarios MARS aprobados y exigidos en CI\\
 Casos de prueba propios & Cumple & ejemplos MIPS, TAC, sem\'anticos y de r\'ubrica\\
 Evitar cascadas y ciclos & Cumple & normalizaci\'on, l\'imites y regresiones de recuperaci\'on\\
 Arquitectura destino documentada & Cumple & MIPS32, MARS, frames, heap y syscalls\\
 No c\'odigo objeto ni ejecuci\'on interna & Cumple & exportaci\'on a herramienta externa\\
+\bottomrule
+\end{longtable}
+
+\section{Trazabilidad con la r\'ubrica oficial de 30 puntos}
+
+La siguiente tabla conserva las ponderaciones de la r\'ubrica oficial. El estado ``Cubierto'' indica que existe implementaci\'on y evidencia reproducible; la calificaci\'on final corresponde al docente.
+
+\begin{longtable}{p{4.2cm}p{1.1cm}p{7.0cm}}
+\toprule
+Criterio & Pts. & Evidencia principal\\\midrule
+\endhead
+Selecci\'on de registros & 4 & \codigo{getReg}, pico de temporales y ausencia de spills en la regresi\'on de presi\'on\\
+Registros y \'arboles de activaci\'on & 5 & frames alineados y sin solapamiento, padres ac\'iclicos, Fibonacci y m\'etodo recursivo\\
+Variables y constantes & 1 & declaraciones, constantes y asignaciones encadenadas con salida 7; 7; 7\\
+Operaciones aritm\'eticas & 1 & suma, resta, multiplicaci\'on, divisi\'on y m\'odulo con signo\\
+Operaciones l\'ogicas & 1 & comparaciones, negaci\'on y cortocircuito con efectos laterales\\
+Arreglos & 1 & longitud, matrices, l\'imites y alias de strings\\
+Estructuras de control & 3 & condicionales, ciclos, \codigo{break}, \codigo{continue}, \codigo{switch} y \codigo{for(;;)}\\
+Funciones y par\'ametros & 2 & frames, varios par\'ametros, llamadas anidadas y retornos enteros/float\\
+Recursividad & 2 & factorial 120, Fibonacci 21 y m\'etodo recursivo 32\\
+Clases y objetos & 2 & layouts, constructores, fields, m\'etodos y receptor impl\'icito\\
+Herencia & 2 & constructores heredados, vtables y despacho de tres niveles\\
+Manejo de errores con \codigo{try/catch} & 2 & handlers din\'amicos, restauraci\'on de contexto y capturas anidadas\\
+Optimizaci\'on de mirilla & 3 & ocho transformaciones conservadoras, falsos positivos e idempotencia\\
+Ensamblador, simulador o emulador & 1 & 64 programas ensamblados y ejecutados en MARS 4.5\\
+\midrule
+\textbf{Total trazado} & \textbf{30} & Implementaci\'on y pruebas presentes para cada criterio\\
 \bottomrule
 \end{longtable}
 
@@ -842,7 +875,7 @@ Archivo & Responsabilidad\\\midrule
 \archivo{src/cli/run.ts} & modo MIPS y escritura \archivo{.asm}\\
 \archivo{scripts/run-mars.mjs} & invocaci\'on externa de MARS\\
 \archivo{src/__tests__/mips.test.ts} & regresiones del backend\\
-\archivo{src/__tests__/mips.execution.test.ts} y \archivo{second.audit.test.ts} & 52 ejecuciones reales en MARS\\
+\archivo{mips.execution.test.ts}, \archivo{second.audit.test.ts} y \archivo{third.audit.test.ts} & 64 ejecuciones reales en MARS\\
 \archivo{examples/mips} & demostraciones y caso de bloqueo\\
 \archivo{docs/GUIA_PRUEBAS_COMPLETA.md} & casos manuales y resultados esperados\\
 \archivo{docs/MATRIZ_REQUISITOS.md} & trazabilidad detallada de la r\'ubrica\\
@@ -895,7 +928,7 @@ npm.cmd run verify
 npm.cmd audit --audit-level=moderate
 \end{verbatim}
 
-El resultado documentado es: 17 archivos de prueba, 261 pruebas aprobadas, 52 ejecuciones MARS incluidas, build de producci\'on aprobado y cero vulnerabilidades reportadas.
+El resultado documentado es: 18 archivos de prueba, 278 pruebas aprobadas, 64 ejecuciones MARS incluidas, build de producci\'on aprobado y cero vulnerabilidades reportadas.
 
 \section{Generaci\'on y ejecuci\'on manual}
 

@@ -628,7 +628,27 @@ Resultado esperado:
 
 La suite de mirilla comprueba las ocho transformaciones exigibles de forma aislada, confirma que instrucciones parecidas pero necesarias no se eliminan, verifica idempotencia y garantiza que el optimizador no muta la entrada. La suite MARS posterior valida los efectos colaterales sobre la salida observable del programa completo.
 
-## 8. Verificación automatizada completa
+## 8. Tercera auditoría de regresión
+
+Esta suite fuerza combinaciones que suelen revelar efectos colaterales entre semántica, TAC, frames y backend:
+
+```powershell
+$env:MARS_JAR = "C:\Herramientas\Mars4_5.jar"
+$env:REQUIRE_MARS = "1"
+npm.cmd test -- --run src/__tests__/third.audit.test.ts
+```
+
+Resultado esperado:
+
+```text
+1 archivo aprobado
+17 pruebas aprobadas
+12 ejecuciones reales en MARS
+```
+
+Entre las salidas fijadas se encuentran Fibonacci `21`, método recursivo `32`, herencia de tres niveles `child` y `9`, closure de método que retiene `this` con salida `12`, handlers anidados `inner`, `outer`, `done`, y alias de arreglo de strings `a!`, `a`, `a!`. Las cinco comprobaciones restantes validan la estructura de árboles de activación, estadísticas de registros, ocho reglas de mirilla, captura semántica de `this` y bloqueo de TAC/MIPS ante múltiples errores.
+
+## 9. Verificación automatizada completa
 
 Con Java y `tools/Mars4_5.jar` disponibles:
 
@@ -641,9 +661,9 @@ Resultado esperado de la versión documentada:
 
 ```text
 TypeScript: aprobado
-Archivos de prueba: 17 aprobados
-Pruebas: 261 aprobadas
-Ejecuciones MARS incluidas: 52
+Archivos de prueba: 18 aprobados
+Pruebas: 278 aprobadas
+Ejecuciones MARS incluidas: 64
 Build de producción: aprobado
 ```
 
@@ -659,7 +679,7 @@ Resultado esperado:
 found 0 vulnerabilities
 ```
 
-## 9. Criterio de aceptación final
+## 10. Criterio de aceptación final
 
 La entrega puede considerarse lista cuando:
 
@@ -668,5 +688,5 @@ La entrega puede considerarse lista cuando:
 - E06 termina de forma controlada sin una excepción interna de MARS;
 - R01 produce un diagnóstico normal sin bloquear la aplicación;
 - I01 demuestra selección de archivo y resultados dentro de la GUI;
-- la suite completa aprueba 261 pruebas en 17 archivos, incluidas las 52 ejecuciones MARS;
+- la suite completa aprueba 278 pruebas en 18 archivos, incluidas las 64 ejecuciones MARS;
 - el build termina correctamente y la auditoría informa cero vulnerabilidades.

@@ -17,8 +17,8 @@ Esta matriz relaciona las instrucciones de generación de código ensamblador co
 | Continuar tras errores | acumulación por fase y recuperación ANTLR | suite léxica/sintáctica/semántica | Cubierto |
 | Evitar duplicados/ciclos/cascadas | normalización, deduplicación y fases bloqueadas | `analyze.ts`, tests | Cubierto |
 | No TAC/MIPS con errores previos | `skipped` y ensamblador vacío | prueba "bloquea TAC y MIPS" | Cubierto |
-| Optimización de mirilla | ocho reglas locales conservadoras, por encima del mínimo de seis | `peepholeOptimize`, suite dedicada y 52 regresiones MARS | Cubierto |
-| Ensamblador válido | segmentos, etiquetas y opcodes MIPS32 | 52 ejecuciones MARS | Cubierto |
+| Optimización de mirilla | ocho reglas locales conservadoras, por encima del mínimo de seis | `peepholeOptimize`, suite dedicada y 64 regresiones MARS | Cubierto |
+| Ensamblador válido | segmentos, etiquetas y opcodes MIPS32 | 64 ejecuciones MARS | Cubierto |
 | Ejecución con herramienta externa | runner Java configurable | `scripts/run-mars.mjs` | Cubierto |
 | No ejecución interna requerida | UI genera/exporta; MARS es externo | diseño y documentación | Cubierto |
 
@@ -55,15 +55,37 @@ Esta matriz relaciona las instrucciones de generación de código ensamblador co
 | TAC tipado | `src/tac/types.ts`, `generator.ts` | Cubierto |
 | CFG y frames | `controlFlow.ts`, `ActivationRecord` | Cubierto |
 
+## Rúbrica oficial de 30 puntos
+
+La tabla usa los criterios y ponderaciones de la rúbrica oficial. "Cubierto" significa que existe implementación y evidencia reproducible; la asignación final de puntos corresponde al docente.
+
+| Criterio | Puntos | Implementación y evidencia | Estado |
+| --- | ---: | --- | --- |
+| Selección de registros | 4 | `getReg` asigna `$t0`–`$t7`; la tercera auditoría comprueba asignaciones, pico máximo y ausencia de spills en el caso de presión | Cubierto |
+| Registros y árboles de activación | 5 | `ActivationRecord` conserva padre, nivel, tamaño y slots; se comprueban cadenas acíclicas, alineación, no solapamiento, recursión ramificada y método recursivo | Cubierto |
+| Variables y constantes | 1 | declaraciones, `const`, asignaciones encadenadas y almacenamiento por `symbolId`; salida `7`, `7`, `7` | Cubierto |
+| Operaciones aritméticas | 1 | suma, resta, multiplicación, división y módulo con signo; salida `3`, `2`, `-10`, `15` | Cubierto |
+| Operaciones lógicas | 1 | comparaciones, negación y cortocircuito con efectos laterales; salida `false`, `true`, `0` | Cubierto |
+| Arreglos | 1 | creación, longitud, índices, matrices, límites y alias; regresión de strings produce `a!`, `a`, `a!` | Cubierto |
+| Estructuras de control | 3 | `if`, ciclos, `break`, `continue`, `switch`, `for(;;)` y flujo dentro de `try`; salidas exactas en MARS | Cubierto |
+| Funciones y parámetros | 2 | frames, múltiples parámetros, llamadas anidadas, retornos enteros y float | Cubierto |
+| Recursividad | 2 | factorial, Fibonacci ramificado (`21`) y método recursivo que conserva `this` (`32`) | Cubierto |
+| Clases y objetos | 2 | layouts, constructores, fields, métodos, receptor implícito y closures de método | Cubierto |
+| Herencia | 2 | layouts heredados, constructores y vtables; herencia de tres niveles y despacho dinámico producen `child`, `9` | Cubierto |
+| Manejo de errores con `try/catch` | 2 | handlers dinámicos, restauración de pila/frame/closure y captura anidada; salidas `inner`, `outer`, `done` | Cubierto |
+| Optimización de mirilla | 3 | ocho transformaciones conservadoras, dos más que el mínimo, con falsos positivos e idempotencia | Cubierto |
+| Ensamblador/simulador/emulador | 1 | 64 programas ensamblados y ejecutados mediante MARS 4.5 oficial en modo CLI | Cubierto |
+| **Total trazado** | **30** | La suite reproduce la evidencia funcional de todos los criterios | **Cubierto** |
+
 ## Evidencia de calidad
 
 | Control | Resultado verificado |
 | --- | --- |
 | `npm run check` | aprobado |
-| `npm test` | 261 aprobadas en 17 archivos, incluidas 52 ejecuciones MARS |
+| `npm test` | 278 aprobadas en 18 archivos, incluidas 64 ejecuciones MARS |
 | `npm run build` | aprobado |
 | dependencias completas | 0 vulnerabilidades en `npm audit` |
-| MARS 4.5 | 52 casos aprobados; CI los exige con Java 17 |
+| MARS 4.5 | 64 casos aprobados; CI los exige con Java 17 |
 | errores previos | TAC/MIPS omitidos |
 | backend inconsistente | estado `failed`, descarga deshabilitada |
 
