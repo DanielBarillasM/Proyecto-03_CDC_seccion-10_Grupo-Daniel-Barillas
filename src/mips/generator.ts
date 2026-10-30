@@ -525,19 +525,19 @@ class Generator {
 
   private runtime(): void {
     if (this.needsArrayChecks) {
-      const nullMessage = this.stringLabel("Runtime error: null array\n");
-      const boundsMessage = this.stringLabel("Runtime error: array index out of bounds\n");
+      const nullMessage = this.stringLabel("Runtime error: null array");
+      const boundsMessage = this.stringLabel("Runtime error: array index out of bounds");
       this.emit(
         "__rt_throw_null_array:", `  la $v1, ${nullMessage}`, "  j __rt_throw", "  nop",
         "__rt_throw_array_bounds:", `  la $v1, ${boundsMessage}`, "  j __rt_throw", "  nop"
       );
     }
     if (this.needsObjectChecks) {
-      const nullObjectMessage = this.stringLabel("Runtime error: null object\n");
+      const nullObjectMessage = this.stringLabel("Runtime error: null object");
       this.emit("__rt_throw_null_object:", `  la $v1, ${nullObjectMessage}`, "  j __rt_throw", "  nop");
     }
     if (this.needsDivisionChecks) {
-      const divisionMessage = this.stringLabel("Runtime error: division by zero\n");
+      const divisionMessage = this.stringLabel("Runtime error: division by zero");
       this.emit("__rt_throw_div_zero:", `  la $v1, ${divisionMessage}`, "  j __rt_throw", "  nop");
     }
     if (this.needsArrayChecks || this.needsObjectChecks || this.needsDivisionChecks) {
@@ -557,6 +557,9 @@ class Generator {
         "__rt_uncaught:",
         "  move $a0, $v1",
         "  li $v0, 4",
+        "  syscall",
+        "  li $a0, 10",
+        "  li $v0, 11",
         "  syscall",
         "  li $v0, 10",
         "  syscall"

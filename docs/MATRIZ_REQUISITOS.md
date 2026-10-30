@@ -17,8 +17,8 @@ Esta matriz relaciona las instrucciones de generación de código ensamblador co
 | Continuar tras errores | acumulación por fase y recuperación ANTLR | suite léxica/sintáctica/semántica | Cubierto |
 | Evitar duplicados/ciclos/cascadas | normalización, deduplicación y fases bloqueadas | `analyze.ts`, tests | Cubierto |
 | No TAC/MIPS con errores previos | `skipped` y ensamblador vacío | prueba "bloquea TAC y MIPS" | Cubierto |
-| Optimización de mirilla | ocho reglas locales conservadoras, por encima del mínimo de seis | `peepholeOptimize`, suite dedicada y 64 regresiones MARS | Cubierto |
-| Ensamblador válido | segmentos, etiquetas y opcodes MIPS32 | 64 ejecuciones MARS | Cubierto |
+| Optimización de mirilla | ocho reglas locales conservadoras, por encima del mínimo de seis | `peepholeOptimize`, suite dedicada y 76 regresiones MARS | Cubierto |
+| Ensamblador válido | segmentos, etiquetas y opcodes MIPS32 | 76 ejecuciones MARS | Cubierto |
 | Ejecución con herramienta externa | runner Java configurable | `scripts/run-mars.mjs` | Cubierto |
 | No ejecución interna requerida | UI genera/exporta; MARS es externo | diseño y documentación | Cubierto |
 
@@ -61,7 +61,7 @@ La tabla usa los criterios y ponderaciones de la rúbrica oficial. "Cubierto" si
 
 | Criterio | Puntos | Implementación y evidencia | Estado |
 | --- | ---: | --- | --- |
-| Selección de registros | 4 | `getReg` asigna `$t0`–`$t7`; la tercera auditoría comprueba asignaciones, pico máximo y ausencia de spills en el caso de presión | Cubierto |
+| Selección de registros | 4 | `getReg` asigna `$t0`–`$t7`; la tercera y cuarta auditorías comprueban asignaciones, pico máximo, métricas coherentes y ausencia de spills | Cubierto |
 | Registros y árboles de activación | 5 | `ActivationRecord` conserva padre, nivel, tamaño y slots; se comprueban cadenas acíclicas, alineación, no solapamiento, recursión ramificada y método recursivo | Cubierto |
 | Variables y constantes | 1 | declaraciones, `const`, asignaciones encadenadas y almacenamiento por `symbolId`; salida `7`, `7`, `7` | Cubierto |
 | Operaciones aritméticas | 1 | suma, resta, multiplicación, división y módulo con signo; salida `3`, `2`, `-10`, `15` | Cubierto |
@@ -74,7 +74,7 @@ La tabla usa los criterios y ponderaciones de la rúbrica oficial. "Cubierto" si
 | Herencia | 2 | layouts heredados, constructores y vtables; herencia de tres niveles y despacho dinámico producen `child`, `9` | Cubierto |
 | Manejo de errores con `try/catch` | 2 | handlers dinámicos, restauración de pila/frame/closure y captura anidada; salidas `inner`, `outer`, `done` | Cubierto |
 | Optimización de mirilla | 3 | ocho transformaciones conservadoras, dos más que el mínimo, con falsos positivos e idempotencia | Cubierto |
-| Ensamblador/simulador/emulador | 1 | 64 programas ensamblados y ejecutados mediante MARS 4.5 oficial en modo CLI | Cubierto |
+| Ensamblador/simulador/emulador | 1 | 76 programas ensamblados y ejecutados mediante MARS 4.5 oficial en modo CLI | Cubierto |
 | **Total trazado** | **30** | La suite reproduce la evidencia funcional de todos los criterios | **Cubierto** |
 
 ## Evidencia de calidad
@@ -82,10 +82,10 @@ La tabla usa los criterios y ponderaciones de la rúbrica oficial. "Cubierto" si
 | Control | Resultado verificado |
 | --- | --- |
 | `npm run check` | aprobado |
-| `npm test` | 278 aprobadas en 18 archivos, incluidas 64 ejecuciones MARS |
+| `npm test` | 296 aprobadas en 19 archivos, incluidas 76 ejecuciones MARS |
 | `npm run build` | aprobado |
 | dependencias completas | 0 vulnerabilidades en `npm audit` |
-| MARS 4.5 | 64 casos aprobados; CI los exige con Java 17 |
+| MARS 4.5 | 76 casos aprobados; CI los exige con Java 17 |
 | errores previos | TAC/MIPS omitidos |
 | backend inconsistente | estado `failed`, descarga deshabilitada |
 

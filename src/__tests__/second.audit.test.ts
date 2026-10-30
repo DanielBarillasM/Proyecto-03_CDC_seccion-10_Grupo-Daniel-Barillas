@@ -8,6 +8,10 @@ const jar = resolve(process.env.MARS_JAR ?? "tools/Mars4_5.jar");
 const javaProbe = spawnSync("java", ["-version"], { encoding: "utf8", timeout: 5000 });
 const javaAvailable = !javaProbe.error && javaProbe.status === 0;
 
+if (process.env.REQUIRE_MARS === "1" && (!existsSync(jar) || !javaAvailable)) {
+  throw new Error(`MARS obligatorio no disponible: jar=${jar}, java=${javaAvailable}`);
+}
+
 function executeInMars(source: string): string {
   const result = analyzeInput(source, "mips");
   expect(result.accepted).toBe(true);
@@ -186,7 +190,7 @@ const runtimeCases = [
       try { print(numeros[5]); } catch (err) { print(err); }
       print("continua");
     `,
-    "Runtime error: array index out of bounds\n\ncontinua"
+    "Runtime error: array index out of bounds\ncontinua"
   ],
   [
     "return from try removes its handler before the next call",
