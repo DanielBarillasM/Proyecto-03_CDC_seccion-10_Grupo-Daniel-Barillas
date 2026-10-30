@@ -116,18 +116,22 @@ Los booleanos se imprimen como `true`/`false` y `null` como texto, no como enter
 
 ## Optimización de mirilla
 
-No existe una fase independiente de optimización. `peepholeOptimize` procesa una ventana local y elimina:
+No existe una fase independiente de optimización. `peepholeOptimize` procesa una ventana local y aplica ocho transformaciones conservadoras:
 
 1. `move $r, $r`;
-2. `addiu $sp, $sp, 0`;
-3. saltos incondicionales a la etiqueta inmediatamente siguiente;
-4. `nop` consecutivos redundantes.
+2. `addiu $r, $r, 0`;
+3. `addu $r, $r, $zero`;
+4. `subu $r, $r, $zero`;
+5. `or $r, $r, $zero`;
+6. `sll $r, $r, 0`;
+7. saltos incondicionales a la etiqueta inmediatamente siguiente;
+8. `nop` consecutivos redundantes.
 
-El resultado conserva ensamblador previo y posterior, además del contador de eliminaciones.
+El resultado conserva ensamblador previo y posterior, el contador total de eliminaciones y el desglose por regla. Ningún patrón reordena memoria, llamadas o ramas condicionales.
 
 ## Validación
 
-Antes de marcar el resultado como completo se verifica que las etiquetas referidas por `j`, `jal`, ramas y `la` estén definidas. La suite cubre el backend de forma unitaria y ejecuta regresiones de salida en MARS 4.5 real. `npm run mars:setup` descarga el JAR oficial y verifica su SHA-256. CI usa `REQUIRE_MARS=1` para impedir que se omitan estas pruebas por falta del simulador.
+Antes de marcar el resultado como completo se verifica que las etiquetas referidas por `j`, `jal`, ramas y `la` estén definidas. La suite dedicada de mirilla ejercita las ocho reglas, falsos positivos, idempotencia, inmutabilidad y métricas; las 52 regresiones de salida ejecutadas en MARS 4.5 comprueban que el ensamblador optimizado conserva el comportamiento. `npm run mars:setup` descarga el JAR oficial y verifica su SHA-256. CI usa `REQUIRE_MARS=1` para impedir que se omitan estas pruebas por falta del simulador.
 
 ```powershell
 npm.cmd run cli -- examples/mips/07_recursion.cps --mode mips --out factorial.asm

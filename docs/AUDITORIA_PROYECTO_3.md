@@ -1,6 +1,6 @@
 # Auditoría técnica del Proyecto 3
 
-**Fecha:** 28 de octubre de 2026
+**Fecha:** 30 de octubre de 2026
 **Versión revisada:** 3.0.0  
 **Objetivo:** generación de ensamblador MIPS32 desde el TAC del Proyecto 2.
 
@@ -8,7 +8,7 @@
 
 La implementación cubre el pipeline obligatorio y el caso que originó la revisión quedó corregido: una entrada válida o un archivo propio ejecuta el modo `mips`; si frontend y TAC terminan correctamente, la UI genera ensamblador y habilita su descarga. Si existe un error previo, MIPS queda en `skipped` y no se produce artefacto.
 
-La suite contiene **42 casos de ejecución MARS** para enteros, floats, cadenas, funciones, llamadas anidadas, recursión, arreglos, objetos, herencia, métodos, despacho dinámico, constructores heredados, closures, errores de ejecución y `try/catch`. Las matrices se validan mediante el caso manual reproducible de la guía completa de pruebas. El workflow instala Java y exige la ejecución MARS; en una máquina sin Java o sin el JAR, Vitest los omite explícitamente en vez de reportar un falso positivo.
+La suite contiene **52 casos de ejecución MARS** para enteros, floats, cadenas, funciones, llamadas anidadas, recursión, arreglos y matrices, objetos, herencia, métodos, despacho dinámico, constructores heredados, closures, errores de ejecución y `try/catch`. La segunda auditoría automatizó los casos documentados de control de flujo y matrices, y añadió regresiones para cortocircuito lógico, aislamiento de frames, recursión mutua, múltiples parámetros y limpieza de handlers. El workflow instala Java y exige la ejecución MARS; en una máquina sin Java o sin el JAR, Vitest los omite explícitamente en vez de reportar un falso positivo.
 
 ## Problemas corregidos
 
@@ -22,7 +22,8 @@ La suite contiene **42 casos de ejecución MARS** para enteros, floats, cadenas,
 | Alta | Al terminar una función anidada se perdía el contexto de la función exterior | Pila de contextos de generación para frames y epílogos |
 | Alta | Valores función y closures se confundían | Seguimiento diferenciado de puntero crudo y objeto closure |
 | Alta | CLI rechazaba `--mode mips` | Modo MIPS, `--out` y códigos de salida integrados |
-| Media | No existía optimización de mirilla | `peepholeOptimize` conservador con métricas |
+| Media | No existía optimización de mirilla y la primera versión solo documentaba cuatro transformaciones | `peepholeOptimize` con ocho reglas conservadoras, métricas por regla y suite de efectos colaterales |
+| Media | Los ejemplos documentados de matrices y control de flujo no formaban parte de la ejecución automatizada en MARS | `second.audit.test.ts` fija sus salidas exactas y añade contratos de determinismo, bloqueo y estructura de frames |
 | Media | Paquetes y metadatos seguían identificando Proyecto 2 | Versión 3.0.0, repositorio, producto y UI actualizados |
 | Media | Dependencias V0/Next y dos lockfiles incompatibles | Eliminación de restos V0 y lockfile npm único |
 | Media | Vite dependía de `__dirname` en ESM | Resolución con `fileURLToPath(import.meta.url)` |
@@ -56,11 +57,11 @@ npm.cmd run cli:mips
 Resultado verificado:
 
 - TypeScript aprobado;
-- 235 pruebas aprobadas en 15 archivos, incluidos 42 casos ejecutados en MARS 4.5;
+- 261 pruebas aprobadas en 17 archivos, incluidos 52 casos ejecutados en MARS 4.5;
 - build Vite aprobado;
 - auditoría npm completa: 0 vulnerabilidades;
 - CLI TAC y MIPS ejecutadas correctamente;
-- workflow preparado para exigir los 42 casos MARS con Java 17.
+- workflow preparado para exigir los 52 casos MARS con Java 17.
 
 ## Salidas observadas en MARS
 
@@ -85,10 +86,10 @@ Resultado verificado:
 | GUI amigable | Cumple | IDE React/Monaco y panel MIPS |
 | Selector de archivo en GUI | Cumple | menú Archivo, input `.cps` |
 | Resultados en GUI | Cumple | diagnósticos, TAC, frames y MIPS |
-| Casos de prueba propios | Cumple | `examples/mips` y `src/__tests__/mips.test.ts` |
+| Casos de prueba propios | Cumple | `examples/mips`, `mips.test.ts`, `peephole.test.ts`, `second.audit.test.ts` y ejecuciones MARS |
 | Recuperación y múltiples errores | Cumple | listeners, estrategia ANTLR y visitors acumulativos |
 | No TAC/MIPS con errores previos | Cumple | estados `skipped` y pruebas negativas |
-| Mirilla | Cumple | optimizador local y métricas |
+| Mirilla | Cumple | ocho transformaciones locales, métricas por regla y pruebas de falsos positivos/idempotencia |
 | Ensamblador válido/ejecutable externamente | Cumple | ejecución real en MARS 4.5 |
 | No ejecución interna obligatoria | Cumple | runner externo opcional; la UI no simula MIPS |
 

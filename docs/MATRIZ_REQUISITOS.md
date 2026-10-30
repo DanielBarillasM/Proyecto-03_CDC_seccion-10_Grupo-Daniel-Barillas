@@ -17,8 +17,8 @@ Esta matriz relaciona las instrucciones de generación de código ensamblador co
 | Continuar tras errores | acumulación por fase y recuperación ANTLR | suite léxica/sintáctica/semántica | Cubierto |
 | Evitar duplicados/ciclos/cascadas | normalización, deduplicación y fases bloqueadas | `analyze.ts`, tests | Cubierto |
 | No TAC/MIPS con errores previos | `skipped` y ensamblador vacío | prueba "bloquea TAC y MIPS" | Cubierto |
-| Optimización de mirilla | cuatro reglas locales conservadoras | `peepholeOptimize`, prueba unitaria | Cubierto |
-| Ensamblador válido | segmentos, etiquetas y opcodes MIPS32 | 42 ejecuciones MARS | Cubierto |
+| Optimización de mirilla | ocho reglas locales conservadoras, por encima del mínimo de seis | `peepholeOptimize`, suite dedicada y 52 regresiones MARS | Cubierto |
+| Ensamblador válido | segmentos, etiquetas y opcodes MIPS32 | 52 ejecuciones MARS | Cubierto |
 | Ejecución con herramienta externa | runner Java configurable | `scripts/run-mars.mjs` | Cubierto |
 | No ejecución interna requerida | UI genera/exporta; MARS es externo | diseño y documentación | Cubierto |
 
@@ -40,7 +40,7 @@ Esta matriz relaciona las instrucciones de generación de código ensamblador co
 | Strings | `ADD`, `EQ/NE`, constantes | `.asciiz`, concat y comparación | `04_cadenas_y_booleanos.cps` |
 | Impresión | `PRINT` tipado | syscalls 1, 2 y 4 | ejemplos MARS |
 | Registros | operandos TAC | `getReg` `$t0`–`$t7` | estadísticas y tests |
-| Mirilla | ensamblador preliminar | elimina redundancias locales | prueba `peepholeOptimize` |
+| Mirilla | ensamblador preliminar | elimina redundancias locales con ocho reglas y desglose por regla | `peephole.test.ts` |
 
 ## Tabla de símbolos y fases heredadas
 
@@ -60,10 +60,10 @@ Esta matriz relaciona las instrucciones de generación de código ensamblador co
 | Control | Resultado verificado |
 | --- | --- |
 | `npm run check` | aprobado |
-| `npm test` | 235 aprobadas en 15 archivos, incluidas 42 ejecuciones MARS |
+| `npm test` | 261 aprobadas en 17 archivos, incluidas 52 ejecuciones MARS |
 | `npm run build` | aprobado |
 | dependencias completas | 0 vulnerabilidades en `npm audit` |
-| MARS 4.5 | 42 casos aprobados; CI los exige con Java 17 |
+| MARS 4.5 | 52 casos aprobados; CI los exige con Java 17 |
 | errores previos | TAC/MIPS omitidos |
 | backend inconsistente | estado `failed`, descarga deshabilitada |
 

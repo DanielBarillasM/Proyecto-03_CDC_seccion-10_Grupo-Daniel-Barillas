@@ -588,20 +588,52 @@ class Generator {
   private warn(code: string, message: string, i?: TacInstruction): void { this.diagnostics.push({ code, severity: "warning", message, tacIndex: i?.index }); }
 }
 
+export const PEEPHOLE_RULE_IDS = [
+  "self-move",
+  "zero-addiu",
+  "zero-addu",
+  "zero-subu",
+  "zero-or",
+  "zero-shift",
+  "jump-next-label",
+  "duplicate-nop",
+] as const;
+
+export type PeepholeRuleId = (typeof PEEPHOLE_RULE_IDS)[number];
+
+export interface PeepholeOptimizationResult {
+  lines: string[];
+  removed: number;
+  applied: Record<PeepholeRuleId, number>;
+}
+
+function matchPeepholeRule(text: string, previous: string | undefined, next: string | undefined): PeepholeRuleId | undefined {
+  if (/^move\s+(\$[A-Za-z0-9]+),\s*\1$/.test(text)) return "self-move";
+  if (/^addiu\s+(\$[A-Za-z0-9]+),\s*\1,\s*0$/.test(text)) return "zero-addiu";
+  if (/^addu\s+(\$[A-Za-z0-9]+),\s*\1,\s*\$zero$/.test(text)) return "zero-addu";
+  if (/^subu\s+(\$[A-Za-z0-9]+),\s*\1,\s*\$zero$/.test(text)) return "zero-subu";
+  if (/^or\s+(\$[A-Za-z0-9]+),\s*\1,\s*\$zero$/.test(text)) return "zero-or";
+  if (/^sll\s+(\$[A-Za-z0-9]+),\s*\1,\s*0$/.test(text)) return "zero-shift";
+
+  const target = /^j\s+([A-Za-z_][A-Za-z0-9_]*)$/.exec(text)?.[1];
+  const nextLabel = next?.trim().replace(/:$/, "");
+  if (target && target === nextLabel) return "jump-next-label";
+  if (text === "nop" && previous?.trim() === "nop") return "duplicate-nop";
+  return undefined;
+}
+
 /** Optimización de mirilla conservadora sobre ensamblador ya generado. */
-export function peepholeOptimize(lines: string[]): { lines: string[]; removed: number } {
-  const output: string[] = []; let removed = 0;
+export function peepholeOptimize(lines: string[]): PeepholeOptimizationResult {
+  const output: string[] = [];
+  const applied = Object.fromEntries(PEEPHOLE_RULE_IDS.map((rule) => [rule, 0])) as Record<PeepholeRuleId, number>;
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index], text = line.trim();
-    const selfMove = /^move\s+(\$[A-Za-z0-9]+),\s*\1$/.test(text);
-    const zeroStack = /^addiu\s+\$sp,\s*\$sp,\s*0$/.test(text);
-    const target = /^j\s+([A-Za-z_][A-Za-z0-9_]*)$/.exec(text)?.[1];
-    const nextLabel = lines[index + 1]?.trim().replace(/:$/, "");
-    const duplicateNop = text === "nop" && output[output.length - 1]?.trim() === "nop";
-    if (selfMove || zeroStack || (target && target === nextLabel) || duplicateNop) { removed += 1; continue; }
+    const rule = matchPeepholeRule(text, output[output.length - 1], lines[index + 1]);
+    if (rule) { applied[rule] += 1; continue; }
     output.push(line);
   }
-  return { lines: output, removed };
+  const removed = Object.values(applied).reduce((total, count) => total + count, 0);
+  return { lines: output, removed, applied };
 }
 
 export function generateMips(tac: TacGenerationResult): MipsGenerationResult {

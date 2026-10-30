@@ -613,18 +613,20 @@ El panel debe mostrar:
 - instrucciones antes y después de mirilla;
 - optimizaciones eliminadas.
 
-Para ejecutar las pruebas estructurales del backend y la mirilla:
+Para ejecutar las pruebas estructurales del backend y la suite dedicada de mirilla:
 
 ```powershell
-npm.cmd test -- src/__tests__/mips.test.ts
+npm.cmd test -- src/__tests__/mips.test.ts src/__tests__/peephole.test.ts
 ```
 
 Resultado esperado:
 
 ```text
-1 archivo aprobado
-12 pruebas aprobadas
+2 archivos aprobados
+25 pruebas aprobadas
 ```
+
+La suite de mirilla comprueba las ocho transformaciones exigibles de forma aislada, confirma que instrucciones parecidas pero necesarias no se eliminan, verifica idempotencia y garantiza que el optimizador no muta la entrada. La suite MARS posterior valida los efectos colaterales sobre la salida observable del programa completo.
 
 ## 8. Verificación automatizada completa
 
@@ -639,9 +641,9 @@ Resultado esperado de la versión documentada:
 
 ```text
 TypeScript: aprobado
-Archivos de prueba: 15 aprobados
-Pruebas: 235 aprobadas
-Ejecuciones MARS incluidas: 41
+Archivos de prueba: 17 aprobados
+Pruebas: 261 aprobadas
+Ejecuciones MARS incluidas: 52
 Build de producción: aprobado
 ```
 
@@ -666,5 +668,5 @@ La entrega puede considerarse lista cuando:
 - E06 termina de forma controlada sin una excepción interna de MARS;
 - R01 produce un diagnóstico normal sin bloquear la aplicación;
 - I01 demuestra selección de archivo y resultados dentro de la GUI;
-- la suite completa aprueba 235 pruebas, incluidas las 42 ejecuciones MARS;
+- la suite completa aprueba 261 pruebas en 17 archivos, incluidas las 52 ejecuciones MARS;
 - el build termina correctamente y la auditoría informa cero vulnerabilidades.
