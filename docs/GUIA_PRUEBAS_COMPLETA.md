@@ -670,7 +670,29 @@ Las seis comprobaciones estructurales verifican determinismo después de compila
 
 Esta auditoría detectó y corrigió una línea vacía espuria después de `print(err)`: los mensajes capturables ya no llevan un salto interno, mientras que el error no capturado conserva una terminación de línea antes de finalizar MARS.
 
-## 10. Verificación automatizada completa
+## 10. Quinta auditoría de regresión
+
+La quinta suite intenta romper los contratos cruzados que permanecían menos ejercitados y fija el comportamiento de referencias de método enlazadas:
+
+```powershell
+$env:MARS_JAR = "C:\Herramientas\Mars4_5.jar"
+$env:REQUIRE_MARS = "1"
+npm.cmd test -- --run src/__tests__/fifth.audit.test.ts
+```
+
+Resultado esperado:
+
+```text
+1 archivo aprobado
+18 pruebas aprobadas
+12 ejecuciones reales en MARS
+```
+
+Las seis comprobaciones estructurales verifican destinos TAC y CFG cerrado, slots estables de vtable y offsets de campos en tres niveles, propagación de `symbolId` bajo `shadowing`, alineación de un frame con doce parámetros, diagnósticos semánticos deterministas y balance de funciones y temporales. Las doce ejecuciones fijan división y módulo con signo, evaluación izquierda-a-derecha, arreglos de closures independientes, método enlazado que conserva el receptor, despacho virtual heredado, `continue` dentro de `switch`, limpieza del handler al hacer `break`, sombreado del identificador de `catch`, closure recursivo mutable, matrices float con alias, concatenación capturada y cortocircuito con objeto nulo.
+
+Esta auditoría detectó que `let f = objeto.metodo` conservaba la dirección de código, pero no el objeto receptor. El descriptor enlazado ahora contiene ambos valores y la llamada `f()` sigue usando el receptor original aunque la variable `objeto` se reasigne a `null`.
+
+## 11. Verificación automatizada completa
 
 Con Java y `tools/Mars4_5.jar` disponibles:
 
@@ -683,25 +705,27 @@ Resultado esperado de la versión documentada:
 
 ```text
 TypeScript: aprobado
-Archivos de prueba: 19 aprobados
-Pruebas: 296 aprobadas
-Ejecuciones MARS incluidas: 76
+Archivos de prueba: 20 aprobados
+Pruebas: 314 aprobadas
+Ejecuciones MARS incluidas: 88
 Build de producción: aprobado
 ```
 
 Auditoría de dependencias:
 
 ```powershell
-npm.cmd audit --audit-level=moderate
+npm.cmd audit --omit=dev --audit-level=moderate
 ```
 
-Resultado esperado:
+Resultado de producción esperado:
 
 ```text
 found 0 vulnerabilities
 ```
 
-## 11. Criterio de aceptación final
+El comando anterior debe ejecutarse como `npm.cmd audit --omit=dev --audit-level=moderate`. La auditoría completa reporta actualmente 15 avisos moderados en herramientas transitivas de `electron-builder` por `minimatch`; no forman parte del runtime distribuido y la única corrección automática propuesta por npm es una degradación mayor incompatible, por lo que se documentan en lugar de aplicar `--force`.
+
+## 12. Criterio de aceptación final
 
 La entrega puede considerarse lista cuando:
 
@@ -710,5 +734,5 @@ La entrega puede considerarse lista cuando:
 - E06 termina de forma controlada sin una excepción interna de MARS;
 - R01 produce un diagnóstico normal sin bloquear la aplicación;
 - I01 demuestra selección de archivo y resultados dentro de la GUI;
-- la suite completa aprueba 296 pruebas en 19 archivos, incluidas las 76 ejecuciones MARS;
-- el build termina correctamente y la auditoría informa cero vulnerabilidades.
+- la suite completa aprueba 314 pruebas en 20 archivos, incluidas las 88 ejecuciones MARS;
+- el build termina correctamente y la auditoría de dependencias de producción informa cero vulnerabilidades.

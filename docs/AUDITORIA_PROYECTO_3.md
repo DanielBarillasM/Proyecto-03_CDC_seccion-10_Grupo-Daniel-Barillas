@@ -8,7 +8,7 @@
 
 La implementación cubre el pipeline obligatorio y el caso que originó la revisión quedó corregido: una entrada válida o un archivo propio ejecuta el modo `mips`; si frontend y TAC terminan correctamente, la UI genera ensamblador y habilita su descarga. Si existe un error previo, MIPS queda en `skipped` y no se produce artefacto.
 
-La suite contiene **76 casos de ejecución MARS** para enteros, floats, cadenas, funciones, llamadas anidadas, recursión, arreglos y matrices, objetos, herencia, métodos, despacho dinámico, constructores heredados, closures, errores de ejecución y `try/catch`. La segunda auditoría automatizó los casos documentados de control de flujo y matrices. La tercera auditoría amplió la cobertura de registros y frames, aritmética con signo, cortocircuito con efectos laterales, `for(;;)`, `switch`, recursión ramificada, herencia de tres niveles, closures de método, handlers anidados, alias de arreglos de strings y floats. La cuarta auditoría añadió determinismo tras errores, validación independiente de etiquetas, capturas profundas de `this`, coherencia de métricas, llamadas de diez parámetros, despacho dinámico desde arreglos, constructores encadenados y desenrollado de excepciones a través de recursión. En desarrollo local Vitest marca los casos MARS como omitidos si falta Java o el JAR; el workflow usa `REQUIRE_MARS=1`, por lo que esa misma ausencia se convierte en un fallo explícito y no en un falso positivo.
+La suite contiene **88 casos de ejecución MARS** para enteros, floats, cadenas, funciones, llamadas anidadas, recursión, arreglos y matrices, objetos, herencia, métodos, despacho dinámico, constructores heredados, closures, errores de ejecución y `try/catch`. La segunda auditoría automatizó los casos documentados de control de flujo y matrices. La tercera auditoría amplió la cobertura de registros y frames, aritmética con signo, cortocircuito con efectos laterales, `for(;;)`, `switch`, recursión ramificada, herencia de tres niveles, closures de método, handlers anidados, alias de arreglos de strings y floats. La cuarta auditoría añadió determinismo tras errores, validación independiente de etiquetas, capturas profundas de `this`, coherencia de métricas, llamadas de diez parámetros, despacho dinámico desde arreglos, constructores encadenados y desenrollado de excepciones a través de recursión. La quinta auditoría añadió contratos de CFG cerrado, layouts heredados, identidades de símbolos, frames de doce parámetros y temporales balanceados, además de doce ejecuciones que combinan división con signo, orden de evaluación, closures recursivos, matrices float, control dentro de `try`, despacho heredado y referencias de método. En desarrollo local Vitest marca los casos MARS como omitidos si falta Java o el JAR; el workflow usa `REQUIRE_MARS=1`, por lo que esa misma ausencia se convierte en un fallo explícito y no en un falso positivo.
 
 ## Problemas corregidos
 
@@ -29,7 +29,7 @@ La suite contiene **76 casos de ejecución MARS** para enteros, floats, cadenas,
 | Media | Vite dependía de `__dirname` en ESM | Resolución con `fileURLToPath(import.meta.url)` |
 | Media | No existían pruebas o ejemplos MIPS | Suite MIPS y carpeta `examples/mips` |
 | Alta | `try/catch` llegaba al TAC, pero el backend ignoraba sus marcadores | Registro dinámico de manejadores, restauración de pila/frame/closure y captura del mensaje de runtime |
-| Alta | Dependencias directas y transitivas tenían avisos de seguridad | Electron 43.8.3, Vite 6.4.5, Vitest 5.0.5 y lockfile auditado sin vulnerabilidades |
+| Alta | Dependencias directas y transitivas tenían avisos de seguridad de producción | Electron 43.8.3, Vite 6.4.5, Vitest 5.0.5 y lockfile con auditoría de producción limpia; el empaquetador de desarrollo conserva avisos upstream documentados |
 | Media | La interfaz conservaba distribución y estética heredadas | Workbench futurista reconstruido con Motion, barras compactas, inspector vertical, paneles de vidrio y jerarquía responsive sin cambiar el flujo |
 | Media | El repositorio solo versionaba tres archivos | Fuentes, pruebas, ejemplos, documentación y workflows incorporados al control de versiones |
 | Alta | Un constructor explícito de una clase hija omitía la inicialización del padre | TAC invoca primero el constructor heredado y reenvía el receptor y sus parámetros compatibles |
@@ -45,6 +45,7 @@ La suite contiene **76 casos de ejecución MARS** para enteros, floats, cadenas,
 | Alta | Un campo homónimo de una clase hija se traducía usando el offset del campo padre | Resolución del miembro más derivado en TAC y MIPS, con regresión ejecutada en MARS |
 | Alta | Una función anidada dentro de un método podía usar `this` sin que el analizador lo registrara como captura; el backend terminaba con `MIPS040` | La resolución semántica marca `this` como captura cuando cruza el límite de función y una regresión MARS comprueba que el closure conserva el receptor tras retornar el método |
 | Media | Los mensajes internos de runtime incluían un salto de línea y `print(err)` agregaba otro; al continuar después de `catch` aparecía una línea vacía espuria | Los mensajes capturables ya no contienen terminador visual; solo la ruta de error no capturado imprime el salto antes de terminar, y dos regresiones MARS fijan la salida continua |
+| Alta | Una referencia `let f = objeto.metodo` conservaba el código, pero no el receptor; al reasignar `objeto = null`, `f()` fallaba al acceder a `this` | El acceso crea un descriptor enlazado de dos words (código dinámico y receptor), y el ABI de métodos recupera `this` desde el descriptor antes de copiar los parámetros del usuario |
 
 ## Evidencia reproducible
 
@@ -59,11 +60,11 @@ npm.cmd run cli:mips
 Resultado verificado:
 
 - TypeScript aprobado;
-- 296 pruebas aprobadas en 19 archivos, incluidos 76 casos ejecutados en MARS 4.5;
+- 314 pruebas aprobadas en 20 archivos, incluidos 88 casos ejecutados en MARS 4.5;
 - build Vite aprobado;
-- auditoría npm completa: 0 vulnerabilidades;
+- auditoría de dependencias de producción: 0 vulnerabilidades; la cadena opcional de empaquetado Electron reporta 15 avisos moderados upstream de `minimatch`, sin una corrección no disruptiva publicada;
 - CLI TAC y MIPS ejecutadas correctamente;
-- workflow preparado para exigir los 76 casos MARS con Java 17.
+- workflow preparado para exigir los 88 casos MARS con Java 17.
 
 ## Salidas observadas en MARS
 
@@ -81,6 +82,7 @@ Resultado verificado:
 | método recursivo que conserva `this` | `32` |
 | herencia de tres niveles y despacho dinámico | `child`, `9` |
 | closure de método que captura `this` | `12` |
+| referencia de método que retiene su receptor | `6`, `7` |
 
 ## Restricciones del enunciado
 
@@ -92,7 +94,7 @@ Resultado verificado:
 | GUI amigable | Cumple | IDE React/Monaco y panel MIPS |
 | Selector de archivo en GUI | Cumple | menú Archivo, input `.cps` |
 | Resultados en GUI | Cumple | diagnósticos, TAC, frames y MIPS |
-| Casos de prueba propios | Cumple | `examples/mips`, `mips.test.ts`, `peephole.test.ts`, `second.audit.test.ts`, `third.audit.test.ts`, `fourth.audit.test.ts` y ejecuciones MARS |
+| Casos de prueba propios | Cumple | `examples/mips`, `mips.test.ts`, `peephole.test.ts`, `second.audit.test.ts`, `third.audit.test.ts`, `fourth.audit.test.ts`, `fifth.audit.test.ts` y ejecuciones MARS |
 | Recuperación y múltiples errores | Cumple | listeners, estrategia ANTLR y visitors acumulativos |
 | No TAC/MIPS con errores previos | Cumple | estados `skipped` y pruebas negativas |
 | Mirilla | Cumple | ocho transformaciones locales, métricas por regla y pruebas de falsos positivos/idempotencia |

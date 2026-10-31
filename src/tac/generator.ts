@@ -961,9 +961,11 @@ class TacGenerator {
   private applyMethodCall(base: TacOperand, property: SuffixOperatorContext, call: SuffixOperatorContext): TacOperand {
     const methodName = property.Identifier()?.text ?? "<método>";
     const methodType = this.memberType(base.type, methodName);
-    const callable = this.temp(methodType.kind === "function" ? T.fn([base.type ?? T.unknown, ...methodType.params], methodType.returnType) : methodType);
+    // GET_FIELD materializa un descriptor de método ligado que conserva el
+    // receptor evaluado. Por ello la llamada solo apila los parámetros que
+    // escribió el usuario; `this` viaja dentro del descriptor.
+    const callable = this.temp(methodType);
     this.emit("GET_FIELD", { arg1: base, arg2: tacOperand(methodName, "symbol"), result: callable }, property);
-    this.emit("PARAM", { arg1: base }, property);
     const args = call.arguments()?.expression() ?? [];
     for (const argument of args) {
       const value = this.expression(argument);
@@ -971,7 +973,7 @@ class TacGenerator {
       this.release(value);
     }
     const result = this.temp(methodType.kind === "function" ? methodType.returnType : T.unknown);
-    this.emit("CALL", { arg1: callable, arg2: tacOperand(args.length + 1), result }, call);
+    this.emit("CALL", { arg1: callable, arg2: tacOperand(args.length), result }, call);
     this.release(callable);
     this.release(base);
     return result;

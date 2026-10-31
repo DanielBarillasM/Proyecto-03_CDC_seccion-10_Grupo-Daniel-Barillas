@@ -269,7 +269,14 @@ class Generator {
     const bytes = align(frame.totalBytes), allocation = bytes + 12;
     this.emit(`${safeLabel(raw, "fn")}:`, `  addiu $sp, $sp, -${allocation}`, `  sw $s7, ${bytes}($sp)`, `  sw $fp, ${bytes + 4}($sp)`, `  sw $ra, ${bytes + 8}($sp)`, "  move $fp, $sp");
     const params = frame.slots.filter((slot) => slot.kind === "parameter");
-    params.forEach((slot, index) => this.emit(`  lw $t8, ${allocation + 4 + (params.length - index - 1) * 4}($fp)`, `  sw $t8, ${slot.offset}($fp)`));
+    const stackParams = frame.kind === "method" ? params.slice(1) : params;
+    if (frame.kind === "method" && params[0]) {
+      // Los descriptores de método ligado guardan el receptor en el word 1.
+      // Así una referencia `let f = object.method` conserva el objeto que se
+      // evaluó, aunque la variable original cambie antes de invocar `f`.
+      this.emit("  lw $t8, 4($s7)", `  sw $t8, ${params[0].offset}($fp)`);
+    }
+    stackParams.forEach((slot, index) => this.emit(`  lw $t8, ${allocation + 4 + (stackParams.length - index - 1) * 4}($fp)`, `  sw $t8, ${slot.offset}($fp)`));
     for (const slot of frame.slots.filter((candidate) => candidate.sharedCell)) {
       this.emit(slot.kind === "parameter" ? `  lw $t8, ${slot.offset}($fp)` : "  move $t8, $zero",
         "  li $a0, 4", "  li $v0, 9", "  syscall", "  sw $t8, 0($v0)", `  sw $v0, ${slot.offset}($fp)`);
@@ -421,8 +428,17 @@ class Generator {
     if (method) {
       const a = this.registers.getReg(), r = this.registers.getReg();
       this.loadWord(i.arg1, a, i); this.checkObject(a);
-      this.emit(`  lw ${r}, 0(${a})`, `  lw ${r}, ${method.slot * 4}(${r})`);
-      this.storeWord(r, i.result, i); return;
+      this.emit(
+        `  lw ${r}, 0(${a})`,
+        `  lw ${r}, ${method.slot * 4}(${r})`,
+        `  lw ${r}, 0(${r})`,
+        "  li $a0, 8",
+        "  li $v0, 9",
+        "  syscall",
+        `  sw ${r}, 0($v0)`,
+        `  sw ${a}, 4($v0)`
+      );
+      this.storeWord("$v0", i.result, i); return;
     }
     const field = [...(layout?.fields ?? [])].reverse().find((candidate) => candidate.name === name);
     if (!field) return this.error("MIPS027", `Campo o método desconocido: ${name}.`, i);

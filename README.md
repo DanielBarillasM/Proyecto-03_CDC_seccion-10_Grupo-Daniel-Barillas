@@ -260,9 +260,9 @@ Validación automatizada:
 | Verificación | Resultado |
 | --- | ---: |
 | TypeScript `tsc --noEmit` | aprobado |
-| Pruebas automatizadas | 296 aprobadas en 19 archivos |
+| Pruebas automatizadas | 314 aprobadas en 20 archivos |
 | Pruebas específicas MIPS | Estructura del ensamblador y salidas de ejecución |
-| Casos ejecutados en MARS 4.5 | 76 salidas reales, con tipos, frames, matrices, closures de método, clases y errores de runtime |
+| Casos ejecutados en MARS 4.5 | 88 salidas reales, con tipos, frames, matrices, closures y referencias de método enlazadas, clases y errores de runtime |
 | Programa integral | `2`, `6`, `12` |
 | Recursión | factorial `120` |
 | Closures | resultado `1` |
