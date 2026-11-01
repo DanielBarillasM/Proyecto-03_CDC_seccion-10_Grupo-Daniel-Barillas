@@ -4,6 +4,7 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 import { downloadText } from "../lib/downloads";
 import { exampleCase } from "../lib/examples";
 import { analyzeInput } from "../lib/analyze";
+import { resolveIdeAnalyzerMode, resolveIdeResultTab } from "../lib/idePipeline";
 import type { AnalysisMode, AnalyzeResult } from "../lib/types";
 import type { ScopeInfo } from "../semantic/scopes";
 import { ActivitySidebar } from "./components/ActivitySidebar";
@@ -116,13 +117,12 @@ export function App() {
 
     try {
       await new Promise((resolve) => setTimeout(resolve, 0));
-      // El flujo normal del IDE es una compilación completa. Los modos TAC y
-      // MIPS se conservan para demostraciones focalizadas; los ejemplos válidos
-      // y cualquier archivo/código propio llegan hasta MIPS automáticamente.
-      const analyzerMode = mode === "tac" ? "tac" : "mips";
+      // Las opciones del explorador cambian la entrada y el énfasis visual,
+      // no la profundidad del pipeline: toda ejecución intenta llegar a MIPS.
+      const analyzerMode = resolveIdeAnalyzerMode(mode);
       const nextResult = analyzeInput(inputValue, analyzerMode);
       setResult(nextResult);
-      setActiveDockTab(nextResult.mips.status === "completed" ? "mips" : nextResult.tac.status === "completed" ? "tac" : "resultado");
+      setActiveDockTab(resolveIdeResultTab(mode, nextResult));
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       if (message.includes("Cannot find module") || message.includes("generated")) {

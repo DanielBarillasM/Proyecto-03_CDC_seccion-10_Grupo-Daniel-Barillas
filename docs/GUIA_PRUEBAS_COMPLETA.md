@@ -692,7 +692,29 @@ Las seis comprobaciones estructurales verifican destinos TAC y CFG cerrado, slot
 
 Esta auditoría detectó que `let f = objeto.metodo` conservaba la dirección de código, pero no el objeto receptor. El descriptor enlazado ahora contiene ambos valores y la llamada `f()` sigue usando el receptor original aunque la variable `objeto` se reasigne a `null`.
 
-## 11. Verificación automatizada completa
+## 11. Sexta auditoría de regresión
+
+La sexta suite vuelve a recorrer el pipeline después del ajuste visual que permite solicitar la vista TAC sin detener la generación MIPS:
+
+```powershell
+$env:MARS_JAR = "C:\Herramientas\Mars4_5.jar"
+$env:REQUIRE_MARS = "1"
+npm.cmd test -- --run src/__tests__/sixth.audit.test.ts
+```
+
+Resultado esperado:
+
+```text
+1 archivo aprobado
+18 pruebas aprobadas
+12 ejecuciones reales en MARS
+```
+
+Las seis comprobaciones estructurales verifican que todas las selecciones de la GUI ejecutan el modo MIPS, que la selección TAC conserva esa pestaña como resultado visible, que una entrada inválida bloquea TAC y MIPS, que un frame con dieciséis parámetros permanece alineado y dentro de los registros permitidos, que los padres de los registros de activación son válidos y que las etiquetas y métricas de las ocho reglas de mirilla son coherentes. Las doce ejecuciones MARS fijan salidas para variables y constantes, aritmética con signo y float, cortocircuito, matrices y límites capturados, todas las estructuras de control, dieciséis parámetros, recursión mutua, métodos enlazados, despacho dinámico desde arreglos, handlers anidados, closures independientes y un programa integral de la rúbrica.
+
+Durante el diseño de la suite se corrigieron cinco expectativas de prueba que no correspondían a Compiscript: un conteo manual, la inferencia invariante de arreglos, una concatenación string-entero no permitida, un acceso directo con sintaxis inválida y una condición integral. Después de ajustar esas entradas válidas no apareció una regresión del compilador; las 18 pruebas y sus salidas pasaron sin cambios adicionales al backend.
+
+## 12. Verificación automatizada completa
 
 Con Java y `tools/Mars4_5.jar` disponibles:
 
@@ -705,9 +727,9 @@ Resultado esperado de la versión documentada:
 
 ```text
 TypeScript: aprobado
-Archivos de prueba: 20 aprobados
-Pruebas: 314 aprobadas
-Ejecuciones MARS incluidas: 88
+Archivos de prueba: 21 aprobados
+Pruebas: 332 aprobadas
+Ejecuciones MARS incluidas: 100
 Build de producción: aprobado
 ```
 
@@ -725,7 +747,7 @@ found 0 vulnerabilities
 
 El comando anterior debe ejecutarse como `npm.cmd audit --omit=dev --audit-level=moderate`. La auditoría completa reporta actualmente 15 avisos moderados en herramientas transitivas de `electron-builder` por `minimatch`; no forman parte del runtime distribuido y la única corrección automática propuesta por npm es una degradación mayor incompatible, por lo que se documentan en lugar de aplicar `--force`.
 
-## 12. Criterio de aceptación final
+## 13. Criterio de aceptación final
 
 La entrega puede considerarse lista cuando:
 
@@ -734,5 +756,5 @@ La entrega puede considerarse lista cuando:
 - E06 termina de forma controlada sin una excepción interna de MARS;
 - R01 produce un diagnóstico normal sin bloquear la aplicación;
 - I01 demuestra selección de archivo y resultados dentro de la GUI;
-- la suite completa aprueba 314 pruebas en 20 archivos, incluidas las 88 ejecuciones MARS;
+- la suite completa aprueba 332 pruebas en 21 archivos, incluidas las 100 ejecuciones MARS;
 - el build termina correctamente y la auditoría de dependencias de producción informa cero vulnerabilidades.

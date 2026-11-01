@@ -116,7 +116,7 @@ El IDE queda disponible en `http://localhost:3000`.
 4. Inspecciona problemas, tabla de símbolos, ámbitos, árboles, TAC, frames y MIPS.
 5. Descarga `compiscript.asm` desde el panel MIPS o Exportar.
 
-El modo **Generación TAC** termina deliberadamente en la representación intermedia para una demostración focalizada. **Entrada válida**, **Archivo propio** y **Backend MIPS/MARS** ejecutan el pipeline completo.
+El modo **Generación TAC** destaca la representación intermedia, pero el botón **Ejecutar análisis** continúa el mismo resultado hasta MIPS cuando no existen errores. **Entrada válida**, **Archivo propio**, **Generación TAC** y **Backend MIPS/MARS** ejecutan el pipeline completo; las opciones sólo cambian la entrada y el panel de interés.
 
 ## CLI y generación de `.asm`
 
@@ -260,9 +260,9 @@ Validación automatizada:
 | Verificación | Resultado |
 | --- | ---: |
 | TypeScript `tsc --noEmit` | aprobado |
-| Pruebas automatizadas | 314 aprobadas en 20 archivos |
+| Pruebas automatizadas | 332 aprobadas en 21 archivos |
 | Pruebas específicas MIPS | Estructura del ensamblador y salidas de ejecución |
-| Casos ejecutados en MARS 4.5 | 88 salidas reales, con tipos, frames, matrices, closures y referencias de método enlazadas, clases y errores de runtime |
+| Casos ejecutados en MARS 4.5 | 100 salidas reales, con tipos, frames, matrices, closures y referencias de método enlazadas, clases y errores de runtime |
 | Programa integral | `2`, `6`, `12` |
 | Recursión | factorial `120` |
 | Closures | resultado `1` |

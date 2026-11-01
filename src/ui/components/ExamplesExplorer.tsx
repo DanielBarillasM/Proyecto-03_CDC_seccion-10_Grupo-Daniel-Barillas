@@ -34,7 +34,7 @@ const cases: CaseOption[] = [
     id: "tac",
     label: "Generación TAC",
     icon: <Split size={14} />,
-    description: "Genera instrucciones de tres direcciones, temporales, etiquetas y marcos de activación para el programa válido."
+    description: "Destaca instrucciones de tres direcciones, temporales, etiquetas y marcos; después continúa automáticamente hasta MIPS."
   },
   {
     id: "mips",
