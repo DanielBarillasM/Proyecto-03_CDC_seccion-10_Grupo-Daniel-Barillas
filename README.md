@@ -38,7 +38,10 @@ Compiscript (.cps)
 > [!IMPORTANT]
 > Si existe al menos un error léxico, sintáctico o semántico, no se genera TAC ni ensamblador. Si el backend detecta un error interno o una referencia sin resolver, el resultado MIPS queda en estado `failed` y la interfaz deshabilita la exportación.
 
-La aplicación **no ejecuta el ensamblador internamente** ni produce código objeto. El `.asm` se copia, descarga o guarda y se ejecuta con MARS, tal como permite el enunciado.
+La aplicación **no ejecuta el ensamblador internamente** ni produce código objeto. El `.asm` se copia, descarga o guarda y se ejecuta con MARS, tal como permite el enunciado. Para construir el árbol de activación, la aplicación sí interpreta el TAC una vez con límites de pasos, profundidad, heap y salida.
+
+> [!WARNING]
+> El ensamblador optimizado asume la configuración por defecto de MARS, con *delayed branching* desactivado. No se debe ejecutar con la opción `db`, porque la mirilla elimina los `nop` posteriores a saltos y ramas.
 
 ## Características
 
@@ -50,9 +53,10 @@ La aplicación **no ejecuta el ensamblador internamente** ni produce código obj
 | TAC | Cuádruplos tipados, temporales, etiquetas, CFG, frames y layouts de clases |
 | MIPS32 | Aritmética, lógica, comparaciones, control, funciones, recursión, arreglos, objetos, strings, floats y closures |
 | Convención de llamadas | Argumentos en pila, `$sp`, `$fp`, `$ra`, prólogo/epílogo y valor de retorno |
-| Registros | Asignador `getReg` local a cada instrucción de tres direcciones y métricas de uso |
+| Registros | `getReg` con descriptores de registros y direcciones, reutilización dentro del bloque básico y desalojo LRU de `$t0`–`$t7` |
 | Memoria | Segmento `.data`, heap mediante syscall 9, frames y entornos de closures |
-| Mirilla | Elimina movimientos propios, ajustes nulos, saltos al bloque siguiente y `nop` duplicados |
+| Mirilla | Ocho reglas, seis de ellas activas en los ejemplos reales: `nop` tras saltos, saltos al siguiente bloque, código inalcanzable, cadenas de saltos, *store-load forwarding* y fusión de ajustes de pila |
+| Árbol de activación | Intérprete TAC que registra las llamadas reales de una ejecución, con padre dinámico, argumentos, retornos y estado |
 | UI | Editor Monaco, selector `.cps`, pipeline, problemas, árboles, símbolos, TAC, MIPS y exportaciones |
 | CLI | Modos `lexer`, `parser`, `semantic`, `tac` y `mips`, con salida `.asm` |
 
@@ -260,9 +264,9 @@ Validación automatizada:
 | Verificación | Resultado |
 | --- | ---: |
 | TypeScript `tsc --noEmit` | aprobado |
-| Pruebas automatizadas | 332 aprobadas en 21 archivos |
+| Pruebas automatizadas | 412 aprobadas en 23 archivos |
 | Pruebas específicas MIPS | Estructura del ensamblador y salidas de ejecución |
-| Casos ejecutados en MARS 4.5 | 100 salidas reales, con tipos, frames, matrices, closures y referencias de método enlazadas, clases y errores de runtime |
+| Casos ejecutados en MARS 4.5 | 109 salidas reales, con tipos, frames, matrices, closures y referencias de método enlazadas, clases y errores de runtime |
 | Programa integral | `2`, `6`, `12` |
 | Recursión | factorial `120` |
 | Closures | resultado `1` |
@@ -278,7 +282,7 @@ La validación real usa el MARS 4.5 oficial en modo CLI, no un emulador inventad
 │   ├── grammars/          # Gramática activa
 │   ├── generated/         # Lexer/parser/Visitor ANTLR
 │   ├── semantic/          # Tipos, símbolos y ámbitos
-│   ├── tac/               # TAC, CFG, allocators y frames
+│   ├── tac/               # TAC, CFG, frames e intérprete del árbol de activación
 │   ├── mips/              # Backend MIPS32 y mirilla
 │   ├── ui/                # IDE React
 │   ├── cli/               # Compilación por terminal

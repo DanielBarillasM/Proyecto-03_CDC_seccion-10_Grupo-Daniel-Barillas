@@ -84,11 +84,11 @@
 
 El Proyecto 3 completa un compilador educativo para Compiscript. Conserva el lexer y parser generados con ANTLR4TS, el an\'alisis sem\'antico con tabla de s\'imbolos y la representaci\'on intermedia de tres direcciones de las entregas anteriores. Sobre esa base incorpora un backend que transforma exclusivamente TAC en ensamblador MIPS32 compatible con MARS 4.5.
 
-El producto se presenta como una interfaz gr\'afica React con editor Monaco. El usuario puede escribir o seleccionar un archivo \archivo{.cps}, ejecutar el pipeline, observar diagn\'osticos y examinar tokens, CST, \'arbol sem\'antico, s\'imbolos, \'ambitos, TAC, bloques b\'asicos, registros de activaci\'on y ensamblador. La exportaci\'on MIPS se habilita solamente cuando todas las fases terminan correctamente.
+El producto se presenta como una interfaz gr\'afica React con editor Monaco. El usuario puede escribir o seleccionar un archivo \archivo{.cps}, ejecutar el pipeline, observar diagn\'osticos y examinar tokens, CST, \'arbol sem\'antico, s\'imbolos, \'ambitos, TAC, bloques b\'asicos, registros de activaci\'on, \'arbol de activaci\'on de la ejecuci\'on y ensamblador. La exportaci\'on MIPS se habilita solamente cuando todas las fases terminan correctamente.
 
-El backend implementa convenci\'on de llamadas mediante pila, asignaci\'on local de registros, aritm\'etica entera y flotante, control de flujo, funciones, llamadas anidadas, recursi\'on, arreglos, objetos, m\'etodos con despacho din\'amico, strings, closures y recuperaci\'on de errores de ejecuci\'on mediante \codigo{try/catch}. La suite define 100 casos de ejecuci\'on MARS y el workflow los exige con Java 17.
+El backend implementa convenci\'on de llamadas mediante pila, asignaci\'on de registros con descriptores y reutilizaci\'on dentro del bloque b\'asico, aritm\'etica entera y flotante, control de flujo, funciones, llamadas anidadas, recursi\'on, arreglos, objetos, m\'etodos con despacho din\'amico, strings, closures y recuperaci\'on de errores de ejecuci\'on mediante \codigo{try/catch}. La suite define 109 casos de ejecuci\'on MARS y el workflow los exige con Java 17.
 
-El resultado no es solamente un traductor de ejemplos aislados. Es un pipeline verificable con contratos entre fases, bloqueo seguro ante entradas inv\'alidas, diagn\'osticos acumulativos y evidencia reproducible. La versi\'on documentada contiene 332 pruebas automatizadas en 21 archivos: 232 verificaciones que no requieren herramientas externas y 100 ejecuciones reales del ensamblador generado en MARS 4.5. El informe explica las decisiones que permiten sostener esa compatibilidad, los riesgos que se corrigieron y la relaci\'on entre cada requisito y su evidencia.
+El resultado no es solamente un traductor de ejemplos aislados. Es un pipeline verificable con contratos entre fases, bloqueo seguro ante entradas inv\'alidas, diagn\'osticos acumulativos y evidencia reproducible. La versi\'on documentada contiene 412 pruebas automatizadas en 23 archivos: 303 verificaciones que no requieren herramientas externas y 109 ejecuciones reales del ensamblador generado en MARS 4.5. El informe explica las decisiones que permiten sostener esa compatibilidad, los riesgos que se corrigieron y la relaci\'on entre cada requisito y su evidencia.
 
 \begin{destacado}
 \textbf{Resultado principal.} Un archivo Compiscript v\'alido puede seleccionarse en la interfaz, recorrer lexer, parser, sem\'antica y TAC, producir MIPS32, descargarse como \archivo{.asm} y ejecutarse externamente en MARS. Si aparece un error l\'exico, sint\'actico o sem\'antico, las fases TAC y MIPS quedan omitidas y no se habilita una exportaci\'on potencialmente incorrecta.
@@ -134,10 +134,11 @@ Generador obligatorio de analizadores & ANTLR4TS genera lexer, parser y Visitor 
 Ensamblador obligatorio desde TAC & La API del backend recibe \codigo{TacGenerationResult}; no consulta el CST para reconstruir el programa.\\
 Interfaz gr\'afica & Workbench React con Monaco, explorador, pipeline, problemas, inspectores y temas claro/oscuro.\\
 Selecci\'on de archivo en GUI & El men\'u Archivo permite cargar entradas \archivo{.cps} sin depender de la consola.\\
-Resultados visibles en GUI & Tokens, \`arboles, s\'imbolos, \`ambitos, TAC, frames, MIPS y m\'etricas aparecen en paneles internos.\\
+Resultados visibles en GUI & Tokens, \`arboles, s\'imbolos, \`ambitos, TAC, frames, \'arbol de activaci\'on, MIPS y m\'etricas aparecen en paneles internos.\\
 Recuperaci\'on de errores & Listeners, estrategia de ANTLR, normalizaci\'on y deduplicaci\'on permiten reportar varios problemas por ejecuci\'on.\\
 No generar tras errores & Un error previo establece TAC/MIPS en \codigo{skipped}; la descarga se habilita solo para \codigo{completed}.\\
-Optimizaci\'on de mirilla & Ocho reglas locales superan el m\'inimo de seis transformaciones y reportan conteos totales y por regla.\\
+Optimizaci\'on de mirilla & Ocho reglas locales, seis de ellas activas sobre el ensamblador de los ejemplos reales, reportan instrucciones eliminadas y aplicaciones por regla.\\
+\'Arbol de activaci\'on & Un int\'erprete de TAC registra las llamadas reales de una ejecuci\'on con su padre din\'amico.\\
 Ejecuci\'on externa & El \archivo{.asm} se valida con MARS 4.5 mediante Java y el runner incluido.\\
 \bottomrule
 \end{longtable}
@@ -259,6 +260,12 @@ El llamador apila argumentos de izquierda a derecha. La funci\'on reserva el fra
 
 Un registro de activaci\'on no es solo espacio temporal. Es la frontera entre una invocaci\'on y otra: dos llamadas recursivas a \codigo{factorial} comparten el mismo c\'odigo, pero poseen par\'ametros, temporales y direcciones de retorno diferentes. El frame pointer ofrece una base estable aun cuando el stack pointer cambie al apilar argumentos de llamadas internas.
 
+\section{\'Arbol de activaci\'on}
+
+Los registros de activaci\'on describen la forma de cada frame y su padre l\'exico. El \'arbol de activaci\'on es distinto: contiene un nodo por cada llamada real durante una ejecuci\'on, y el padre de cada nodo es la llamada que lo invoc\'o. Para construirlo, \archivo{src/tac/interpreter.ts} interpreta el TAC una vez con la misma sem\'antica que el backend: enteros de 32 bits, flotantes de precisi\'on simple, closures, despacho din\'amico y manejadores \codigo{try/catch}.
+
+Cada nodo guarda argumentos, valor de retorno y estado: retorn\'o, fue desenrollado por una excepci\'on o qued\'o activo si la ejecuci\'on se detuvo. La ejecuci\'on se limita a 500\,000 instrucciones TAC, profundidad 1\,000, 16 MiB de heap y un mill\'on de caracteres de salida; si se alcanza un l\'imite, el resultado lo indica y no presenta el \'arbol como completo. La salida del int\'erprete coincide con la de MARS en los ejemplos v\'alidos y en las regresiones de ejecuci\'on. El \'arbol aparece en la pesta\~na TAC, en la CLI y en el reporte descargable.
+
 \section{Heap, referencias y tiempo de vida}
 
 Los frames desaparecen al retornar; por eso no pueden almacenar datos que deban sobrevivir a una llamada. Arreglos, objetos, strings concatenados y entornos de closures se reservan en heap mediante syscall 9. Las variables conservan direcciones de 32 bits hacia esos bloques.
@@ -367,9 +374,11 @@ El backend no vuelve a buscar una variable local por nombre cuando existe \codig
 
 \section{Asignador getReg}
 
-El asignador administra \codigo{\$t0} a \codigo{\$t7} y reinicia su conjunto de uso en cada instrucci\'on TAC. Esta decisi\'on corresponde a la naturaleza de tres direcciones: los valores vivos entre instrucciones est\'an en slots, mientras que los registros sirven para cargar operandos y producir un resultado local.
+El asignador administra \codigo{\$t0} a \codigo{\$t7} con dos descriptores. El descriptor de registros indica qu\'e valores contiene cada registro: una direcci\'on de memoria, una constante o una etiqueta. El descriptor de direcciones permite la consulta inversa: en qu\'e registro est\'a ya cargado un valor. Si un operando ya est\'a en un registro, \codigo{getReg} lo reutiliza y evita el \codigo{lw}.
 
-Los registros \codigo{\$t8} y \codigo{\$t9} se reservan para soporte interno, como punteros de funci\'on y comparaciones. La estrategia reporta asignaciones totales, m\'aximo simult\'aneo y spills. Si una instrucci\'on agotara el conjunto disponible, el backend producir\'ia un diagn\'ostico en lugar de reutilizar silenciosamente un registro vivo.
+Cuando hace falta un registro nuevo, se prefiere uno vac\'io. Si no hay, se desaloja el menos usado recientemente entre los que la instrucci\'on actual no necesita. Cada asignaci\'on se escribe de inmediato en memoria, por lo que un desalojo nunca requiere guardar el valor. Los descriptores se vac\'ian en etiquetas, inicios y finales de funci\'on, bloques \codigo{catch}, saltos, retornos y llamadas, porque en esos puntos otro camino de ejecuci\'on puede haber cambiado los registros. Las celdas compartidas de closures nunca se guardan en cach\'e.
+
+Los registros \codigo{\$t8} y \codigo{\$t9} se reservan para soporte interno, como punteros de funci\'on y comparaciones. La estrategia reporta asignaciones, reutilizaciones, desalojos, m\'aximo simult\'aneo y spills. Un spill solo se contar\'ia si una instrucci\'on necesitara m\'as de ocho registros a la vez; en ese caso el backend produce un diagn\'ostico. En \archivo{13\_programa\_integral.cps} se reutilizan 21 valores sin recargarlos desde memoria.
 
 \section{Selecci\'on de instrucciones}
 
@@ -381,7 +390,7 @@ MOV & li/la/lw y sw & depende de la clase del operando\\
 ADD/SUB/MUL & addu/subu/mul & enteros de 32 bits\\
 DIV/MOD & div con mflo/mfhi & cociente o residuo\\
 EQ--GE & seq, sne, slt, sle, sgt, sge & resultado booleano 0/1\\
-IF/GOTO & beq, bne, j & delay slot expl\'icito\\
+IF/GOTO & beq, bne, j & \codigo{nop} preliminar que la mirilla elimina\\
 CALL & jal o jalr & nombre directo o puntero\\
 RETURN & \$v0/\$f0 & salta a un ep\'ilogo com\'un\\
 PRINT & syscall & seleccionado por tipo\\
@@ -440,24 +449,24 @@ El backend protege cuatro familias de operaciones: referencia de arreglo nula, \
 
 \section{Mirilla}
 
-La optimizaci\'on recibe el ensamblador preliminar producido desde TAC y examina una ventana local. Implementa ocho transformaciones, dos m\'as que el m\'inimo de seis solicitado por la r\'ubrica:
+La optimizaci\'on recibe el ensamblador preliminar producido desde TAC y aplica ocho reglas locales en pasadas repetidas hasta que ninguna cambia el c\'odigo. Seis de ellas se activan sobre el ensamblador real de los ejemplos, una m\'as de lo necesario para cumplir el m\'inimo de seis transformaciones de la r\'ubrica:
 
 \begin{longtable}{p{5.4cm}p{7.4cm}}
 \toprule
 Patr\'on & Justificaci\'on\\\midrule
 \endhead
-\codigo{move \$r, \$r} & La copia hacia el mismo registro no modifica el estado.\\
-\codigo{addiu \$r, \$r, 0} & Cero es el elemento neutro de la suma.\\
-\codigo{addu \$r, \$r, \$zero} & La suma con el registro cero conserva el operando.\\
-\codigo{subu \$r, \$r, \$zero} & Restar cero conserva el operando.\\
-\codigo{or \$r, \$r, \$zero} & La disyunci\'on bit a bit con cero conserva el operando.\\
-\codigo{sll \$r, \$r, 0} & Un desplazamiento de cero bits no cambia el valor.\\
-\codigo{j L} seguido inmediatamente de \codigo{L:} & La ejecuci\'on llega al mismo destino sin el salto.\\
-Dos \codigo{nop} consecutivos & Se conserva uno y se elimina la redundancia local.\\
+\codigo{nop} despu\'es de un salto o rama & MARS ejecuta por defecto sin \emph{delayed branching}, as\'i que el \codigo{nop} no cumple funci\'on.\\
+\codigo{j L} seguido de \codigo{L:} & La ejecuci\'on llega al mismo destino sin el salto.\\
+C\'odigo despu\'es de \codigo{j}, \codigo{jr} o \codigo{b} hasta la siguiente etiqueta & Ninguna ruta puede alcanzarlo.\\
+Salto hacia una etiqueta cuyo contenido es otro salto & Se apunta directamente al destino final; los ciclos de saltos no se modifican.\\
+\codigo{sw \$r, X} seguido de \codigo{lw \$s, X} & La carga se reemplaza por \codigo{move} o se elimina si el registro es el mismo.\\
+\codigo{lw \$r, X} seguido de \codigo{sw \$r, X} & El store escribe el valor que la memoria ya ten\'ia.\\
+Dos \codigo{addiu \$sp} consecutivos & Se fusionan si la suma cabe en un inmediato de 16 bits con signo.\\
+\codigo{move \$r, \$r}, \codigo{addiu \$r, \$r, 0} y similares & Identidades algebraicas que no modifican el estado.\\
 \bottomrule
 \end{longtable}
 
-Se conserva la salida previa para auditor\'ia y se informa cu\'antas instrucciones se removieron, tanto en total como por regla. Las reglas no reordenan accesos a memoria, llamadas ni ramas condicionales. La suite dedicada prueba cada transformaci\'on, falsos positivos, idempotencia, inmutabilidad de la entrada y acumulaci\'on de m\'etricas; las 100 ejecuciones MARS verifican que el ensamblador optimizado mantiene las salidas observables.
+Se conserva la salida previa para auditor\'ia. El total informado es la reducci\'on real de instrucciones; el desglose por regla cuenta aplicaciones, porque reemplazar un \codigo{lw} por \codigo{move} o redirigir un salto transforma el c\'odigo sin reducir su tama\~no. En \archivo{13\_programa\_integral.cps} el programa pasa de 262 a 217 instrucciones. Las reglas no reordenan accesos a memoria ni llamadas. Como se eliminan los \codigo{nop} posteriores a saltos, el ensamblador optimizado no debe ejecutarse con la opci\'on \codigo{db} de MARS. La suite dedicada prueba cada transformaci\'on, falsos positivos, idempotencia, inmutabilidad de la entrada y acumulaci\'on de m\'etricas; las 109 ejecuciones MARS verifican que el ensamblador optimizado mantiene las salidas observables.
 
 \section{Validaci\'on del ensamblador generado}
 
@@ -702,7 +711,7 @@ Cada correcci\'on de alto impacto incorpora una regresi\'on. Por ejemplo, el des
 
 \section{Suite automatizada}
 
-La suite final contiene 332 casos en 21 archivos: 232 se ejecutan sin herramientas externas y 100 validan la salida real en MARS cuando Java y el JAR est\'an disponibles. Las pruebas del backend verifican generaci\'on completa, convenci\'on de pila, arreglos, runtime de strings, llamadas anidadas, closures, despacho din\'amico, constructores heredados, contratos de sobrescritura, campos hom\'onimos, errores de objeto nulo y divisi\'on entre cero, recuperaci\'on de \texttt{try/catch} y bloqueo por errores. La suite \archivo{peephole.test.ts} a\~nade regresiones aisladas para las ocho reglas, falsos positivos, idempotencia, inmutabilidad y m\'etricas. La segunda auditor\'ia en \archivo{second.audit.test.ts} agrega 13 contratos sobre bloqueo de fases, determinismo, estructura de frames y diez salidas MARS. La tercera auditor\'ia en \archivo{third.audit.test.ts} agrega 17 contratos, de los cuales 12 ejecutan MARS, y profundiza en activation records, registros, mirilla, herencia, closures y handlers anidados. La cuarta auditor\'ia en \archivo{fourth.audit.test.ts} agrega 18 contratos, con 12 ejecuciones MARS: determinismo despu\'es de errores, etiquetas resueltas, capturas profundas de \codigo{this}, m\'etricas coherentes, estructuras de control combinadas, diez par\'ametros, despacho din\'amico desde arreglos, constructores encadenados y excepciones que atraviesan llamadas recursivas. La quinta auditor\'ia en \archivo{fifth.audit.test.ts} suma 18 contratos, con 12 ejecuciones MARS: CFG cerrado, layouts de tres niveles, identidades de s\'imbolos, frames de doce par\'ametros, temporales balanceados, orden de evaluaci\'on, closures recursivos, control dentro de \codigo{try}, matrices float y referencias de m\'etodo enlazadas. La sexta auditor\'ia en \archivo{sixth.audit.test.ts} agrega 18 contratos, con 12 ejecuciones MARS: el flujo de la GUI siempre completa MIPS, los errores previos bloquean las fases posteriores, los frames soportan diecis\'eis par\'ametros alineados, los \'arboles de activaci\'on conservan padres v\'alidos y un programa integral reproduce las familias de la r\'ubrica. Las pruebas heredadas contin\'uan verificando lexer, parser, sem\'antica, s\'imbolos, TAC, CFG, UI y la exportaci\'on del modo MIPS.
+La suite final contiene 412 casos en 23 archivos: 303 se ejecutan sin herramientas externas y 109 validan la salida real en MARS cuando Java y el JAR est\'an disponibles. Las pruebas del backend verifican generaci\'on completa, convenci\'on de pila, arreglos, runtime de strings, llamadas anidadas, closures, despacho din\'amico, constructores heredados, contratos de sobrescritura, campos hom\'onimos, errores de objeto nulo y divisi\'on entre cero, recuperaci\'on de \texttt{try/catch} y bloqueo por errores. La suite \archivo{peephole.test.ts} a\~nade regresiones aisladas para las ocho reglas, falsos positivos, idempotencia, inmutabilidad y m\'etricas. La segunda auditor\'ia en \archivo{second.audit.test.ts} agrega 13 contratos sobre bloqueo de fases, determinismo, estructura de frames y diez salidas MARS. La tercera auditor\'ia en \archivo{third.audit.test.ts} agrega 17 contratos, de los cuales 12 ejecutan MARS, y profundiza en activation records, registros, mirilla, herencia, closures y handlers anidados. La cuarta auditor\'ia en \archivo{fourth.audit.test.ts} agrega 18 contratos, con 12 ejecuciones MARS: determinismo despu\'es de errores, etiquetas resueltas, capturas profundas de \codigo{this}, m\'etricas coherentes, estructuras de control combinadas, diez par\'ametros, despacho din\'amico desde arreglos, constructores encadenados y excepciones que atraviesan llamadas recursivas. La quinta auditor\'ia en \archivo{fifth.audit.test.ts} suma 18 contratos, con 12 ejecuciones MARS: CFG cerrado, layouts de tres niveles, identidades de s\'imbolos, frames de doce par\'ametros, temporales balanceados, orden de evaluaci\'on, closures recursivos, control dentro de \codigo{try}, matrices float y referencias de m\'etodo enlazadas. La sexta auditor\'ia en \archivo{sixth.audit.test.ts} agrega 18 contratos, con 12 ejecuciones MARS: el flujo de la GUI siempre completa MIPS, los errores previos bloquean las fases posteriores, los frames soportan diecis\'eis par\'ametros alineados, los registros de activaci\'on conservan padres l\'exicos v\'alidos y un programa integral reproduce las familias de la r\'ubrica. Despu\'es de la auditor\'ia externa se agregaron \archivo{registers.test.ts}, que comprueba reutilizaci\'on, presi\'on de registros e invalidaci\'on en ciclos y llamadas, e \archivo{interpreter.test.ts}, que valida el \'arbol din\'amico, el desenrollado por excepciones y los l\'imites de ejecuci\'on; la suite de mirilla exige adem\'as seis reglas activas sobre ejemplos reales. Las pruebas heredadas contin\'uan verificando lexer, parser, sem\'antica, s\'imbolos, TAC, CFG, UI y la exportaci\'on del modo MIPS.
 
 Los 232 casos independientes de herramientas externas permiten obtener retroalimentaci\'on incluso si MARS no est\'a instalado. Sin embargo, no se confunden con ejecuci\'on de ensamblador: cuando \codigo{REQUIRE\_MARS=1}, la ausencia de Java o del JAR hace fallar la suite en lugar de omitir silenciosamente los 100 escenarios.
 
@@ -810,8 +819,8 @@ La siguiente tabla conserva las ponderaciones de la r\'ubrica oficial. El estado
 \toprule
 Criterio & Pts. & Evidencia principal\\\midrule
 \endhead
-Selecci\'on de registros & 4 & \codigo{getReg}, pico de temporales y ausencia de spills en la regresi\'on de presi\'on\\
-Registros y \'arboles de activaci\'on & 5 & frames alineados y sin solapamiento, padres ac\'iclicos, Fibonacci y m\'etodo recursivo\\
+Selecci\'on de registros & 4 & \codigo{getReg} con descriptores, reutilizaci\'on y desalojo LRU; \archivo{registers.test.ts}\\
+Registros y \'arboles de activaci\'on & 5 & frames alineados y sin solapamiento; \'arbol din\'amico de llamadas en GUI, CLI y reporte; \archivo{interpreter.test.ts}\\
 Variables y constantes & 1 & declaraciones, constantes y asignaciones encadenadas con salida 7; 7; 7\\
 Operaciones aritm\'eticas & 1 & suma, resta, multiplicaci\'on, divisi\'on y m\'odulo con signo\\
 Operaciones l\'ogicas & 1 & comparaciones, negaci\'on y cortocircuito con efectos laterales\\
@@ -822,8 +831,8 @@ Recursividad & 2 & factorial 120, Fibonacci 21 y m\'etodo recursivo 32\\
 Clases y objetos & 2 & layouts, constructores, fields, m\'etodos y receptor impl\'icito\\
 Herencia & 2 & constructores heredados, vtables y despacho de tres niveles\\
 Manejo de errores con \codigo{try/catch} & 2 & handlers din\'amicos, restauraci\'on de contexto y capturas anidadas\\
-Optimizaci\'on de mirilla & 3 & ocho transformaciones conservadoras, falsos positivos e idempotencia\\
-Ensamblador, simulador o emulador & 1 & 100 programas ensamblados y ejecutados en MARS 4.5\\
+Optimizaci\'on de mirilla & 3 & ocho reglas, seis activas en c\'odigo real, falsos positivos e idempotencia\\
+Ensamblador, simulador o emulador & 1 & 109 programas ensamblados y ejecutados en MARS 4.5\\
 \midrule
 \textbf{Total trazado} & \textbf{30} & Implementaci\'on y pruebas presentes para cada criterio\\
 \bottomrule
@@ -845,7 +854,7 @@ Compiscript no expone una sentencia \codigo{throw} de usuario; sin embargo, el b
 
 La memoria de heap se obtiene mediante syscall 9 y no se libera, porque MARS no ofrece un recolector de basura integrado y el alcance no exige administraci\'on manual completa. Esta decisi\'on es adecuada para programas educativos de duraci\'on limitada, pero no para procesos de larga vida con asignaci\'on intensiva.
 
-No existe una fase global de optimizaci\'on, de acuerdo con el alcance: se aplica mirilla local. Los valores persistentes regresan a slots entre instrucciones, una estrategia robusta y explicable que sacrifica parte del rendimiento frente a una asignaci\'on global basada en liveness.
+No existe una fase global de optimizaci\'on, de acuerdo con el alcance: se aplica mirilla local. Cada asignaci\'on se escribe de inmediato en su slot y los registros solo conservan copias dentro de un bloque b\'asico. Esta estrategia es robusta y explicable, pero sacrifica parte del rendimiento frente a una asignaci\'on global basada en liveness.
 
 MARS implementa un entorno educativo y syscalls particulares; el ensamblador generado est\'a orientado a esa compatibilidad. Portarlo a Linux MIPS o a hardware real requerir\'ia revisar ABI, syscalls, formato ejecutable y enlazado.
 
@@ -878,7 +887,8 @@ Archivo & Responsabilidad\\\midrule
 \archivo{src/cli/run.ts} & modo MIPS y escritura \archivo{.asm}\\
 \archivo{scripts/run-mars.mjs} & invocaci\'on externa de MARS\\
 \archivo{src/__tests__/mips.test.ts} & regresiones del backend\\
-\archivo{mips.execution.test.ts}, \archivo{second.audit.test.ts}, \archivo{third.audit.test.ts}, \archivo{fourth.audit.test.ts}, \archivo{fifth.audit.test.ts} y \archivo{sixth.audit.test.ts} & 100 ejecuciones reales en MARS\\
+\archivo{mips.execution.test.ts}, \archivo{second.audit.test.ts}, \archivo{third.audit.test.ts}, \archivo{fourth.audit.test.ts}, \archivo{fifth.audit.test.ts} y \archivo{sixth.audit.test.ts} & 109 ejecuciones reales en MARS\\
+\archivo{src/tac/interpreter.ts} & int\'erprete de TAC y \'arbol de activaci\'on din\'amico\\
 \archivo{examples/mips} & demostraciones y caso de bloqueo\\
 \archivo{docs/GUIA_PRUEBAS_COMPLETA.md} & casos manuales y resultados esperados\\
 \archivo{docs/MATRIZ_REQUISITOS.md} & trazabilidad detallada de la r\'ubrica\\
@@ -931,7 +941,7 @@ npm.cmd run verify
 npm.cmd audit --omit=dev --audit-level=moderate
 \end{verbatim}
 
-El resultado documentado es: 21 archivos de prueba, 332 pruebas aprobadas, 100 ejecuciones MARS incluidas, build de producci\'on aprobado y cero vulnerabilidades en las dependencias distribuidas.
+El resultado documentado es: 23 archivos de prueba, 412 pruebas aprobadas, 109 ejecuciones MARS incluidas, build de producci\'on aprobado y cero vulnerabilidades en las dependencias distribuidas.
 
 \section{Generaci\'on y ejecuci\'on manual}
 

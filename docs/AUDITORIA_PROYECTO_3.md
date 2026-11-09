@@ -8,7 +8,7 @@
 
 La implementación cubre el pipeline obligatorio y el caso que originó la revisión quedó corregido: una entrada válida o un archivo propio ejecuta el modo `mips`; si frontend y TAC terminan correctamente, la UI genera ensamblador y habilita su descarga. Si existe un error previo, MIPS queda en `skipped` y no se produce artefacto.
 
-La suite contiene **100 casos de ejecución MARS** para enteros, floats, cadenas, funciones, llamadas anidadas, recursión, arreglos y matrices, objetos, herencia, métodos, despacho dinámico, constructores heredados, closures, errores de ejecución y `try/catch`. La segunda auditoría automatizó los casos documentados de control de flujo y matrices. La tercera auditoría amplió la cobertura de registros y frames, aritmética con signo, cortocircuito con efectos laterales, `for(;;)`, `switch`, recursión ramificada, herencia de tres niveles, closures de método, handlers anidados, alias de arreglos de strings y floats. La cuarta auditoría añadió determinismo tras errores, validación independiente de etiquetas, capturas profundas de `this`, coherencia de métricas, llamadas de diez parámetros, despacho dinámico desde arreglos, constructores encadenados y desenrollado de excepciones a través de recursión. La quinta auditoría añadió contratos de CFG cerrado, layouts heredados, identidades de símbolos, frames de doce parámetros y temporales balanceados, además de doce ejecuciones que combinan división con signo, orden de evaluación, closures recursivos, matrices float, control dentro de `try`, despacho heredado y referencias de método. La sexta auditoría fijó el contrato de la interfaz para ejecutar MIPS aun cuando la pestaña solicitada sea TAC, confirmó el bloqueo de TAC/MIPS ante errores, probó frames alineados con dieciséis parámetros, validó padres de árboles de activación y añadió doce ejecuciones integrales de los criterios oficiales. En desarrollo local Vitest marca los casos MARS como omitidos si falta Java o el JAR; el workflow usa `REQUIRE_MARS=1`, por lo que esa misma ausencia se convierte en un fallo explícito y no en un falso positivo.
+La suite contiene **109 casos de ejecución MARS** para enteros, floats, cadenas, funciones, llamadas anidadas, recursión, arreglos y matrices, objetos, herencia, métodos, despacho dinámico, constructores heredados, closures, errores de ejecución y `try/catch`. La segunda auditoría automatizó los casos documentados de control de flujo y matrices. La tercera auditoría amplió la cobertura de registros y frames, aritmética con signo, cortocircuito con efectos laterales, `for(;;)`, `switch`, recursión ramificada, herencia de tres niveles, closures de método, handlers anidados, alias de arreglos de strings y floats. La cuarta auditoría añadió determinismo tras errores, validación independiente de etiquetas, capturas profundas de `this`, coherencia de métricas, llamadas de diez parámetros, despacho dinámico desde arreglos, constructores encadenados y desenrollado de excepciones a través de recursión. La quinta auditoría añadió contratos de CFG cerrado, layouts heredados, identidades de símbolos, frames de doce parámetros y temporales balanceados, además de doce ejecuciones que combinan división con signo, orden de evaluación, closures recursivos, matrices float, control dentro de `try`, despacho heredado y referencias de método. La sexta auditoría fijó el contrato de la interfaz para ejecutar MIPS aun cuando la pestaña solicitada sea TAC, confirmó el bloqueo de TAC/MIPS ante errores, probó frames alineados con dieciséis parámetros, validó padres de árboles de activación y añadió doce ejecuciones integrales de los criterios oficiales. En desarrollo local Vitest marca los casos MARS como omitidos si falta Java o el JAR; el workflow usa `REQUIRE_MARS=1`, por lo que esa misma ausencia se convierte en un fallo explícito y no en un falso positivo.
 
 ## Problemas corregidos
 
@@ -60,11 +60,24 @@ npm.cmd run cli:mips
 Resultado verificado:
 
 - TypeScript aprobado;
-- 332 pruebas aprobadas en 21 archivos, incluidos 100 casos ejecutados en MARS 4.5;
+- 412 pruebas aprobadas en 23 archivos, incluidos 109 casos ejecutados en MARS 4.5;
 - build Vite aprobado;
 - auditoría de dependencias de producción: 0 vulnerabilidades; la cadena opcional de empaquetado Electron reporta 15 avisos moderados upstream de `minimatch`, sin una corrección no disruptiva publicada;
 - CLI TAC y MIPS ejecutadas correctamente;
-- workflow preparado para exigir los 100 casos MARS con Java 17.
+- workflow preparado para exigir los 109 casos MARS con Java 17.
+
+## Correcciones posteriores a la auditoría externa
+
+Una revisión contra el enunciado y la rúbrica encontró cuatro problemas que las auditorías anteriores no detectaban:
+
+| Hallazgo | Corrección | Evidencia |
+| --- | --- | --- |
+| Las ocho reglas de mirilla existían, pero ninguna se activaba en el ensamblador de los ejemplos | Nuevas reglas: `nop` tras saltos, saltos al siguiente bloque, código inalcanzable, cadenas de saltos, *store-load forwarding*, stores redundantes, fusión de ajustes de pila e identidades algebraicas | Seis reglas se activan en los ejemplos reales; `13_programa_integral.cps` baja de 262 a 217 instrucciones |
+| `getReg` liberaba todos los registros en cada instrucción TAC y nunca reutilizaba valores | Descriptores de registros y direcciones, reutilización dentro del bloque básico y desalojo LRU | `registers.test.ts` y métricas de reutilización y desalojo |
+| El "árbol de activación" era la cadena léxica de frames | Intérprete TAC que registra el árbol dinámico de llamadas de una ejecución | `interpreter.test.ts`, panel de la pestaña TAC, CLI y reporte descargable |
+| Una prueba MARS fallaba de forma intermitente por el tiempo límite de 5 s de Vitest | Tiempo límite global de 30 s | Suite completa estable con `REQUIRE_MARS=1` |
+
+El ensamblador optimizado requiere ejecutar MARS con *delayed branching* desactivado, que es su configuración por defecto.
 
 ## Salidas observadas en MARS
 
@@ -97,7 +110,7 @@ Resultado verificado:
 | Casos de prueba propios | Cumple | `examples/mips`, `mips.test.ts`, `peephole.test.ts`, `second.audit.test.ts`, `third.audit.test.ts`, `fourth.audit.test.ts`, `fifth.audit.test.ts`, `sixth.audit.test.ts` y ejecuciones MARS |
 | Recuperación y múltiples errores | Cumple | listeners, estrategia ANTLR y visitors acumulativos |
 | No TAC/MIPS con errores previos | Cumple | estados `skipped` y pruebas negativas |
-| Mirilla | Cumple | ocho transformaciones locales, métricas por regla y pruebas de falsos positivos/idempotencia |
+| Mirilla | Cumple | ocho reglas locales, seis activas en ejemplos reales, métricas por regla y pruebas de falsos positivos/idempotencia |
 | Ensamblador válido/ejecutable externamente | Cumple | ejecución real en MARS 4.5 |
 | No ejecución interna obligatoria | Cumple | runner externo opcional; la UI no simula MIPS |
 

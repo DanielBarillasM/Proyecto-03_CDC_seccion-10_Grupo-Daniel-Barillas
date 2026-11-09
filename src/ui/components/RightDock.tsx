@@ -6,6 +6,7 @@ import { downloadText, tacReportToText, tacToCsv } from "../../lib/downloads";
 import type { AnalyzeResult } from "../../lib/types";
 import { formatTac } from "../../tac/types";
 import type { ScopeInfo } from "../../semantic/scopes";
+import { ActivationTreePanel } from "./ActivationTreePanel";
 import { DocumentationPanel } from "./DocumentationPanel";
 import { EmptyPanel } from "./EmptyPanel";
 import { ExportsPanel } from "./ExportsPanel";
@@ -107,6 +108,7 @@ function TacInspector({ result }: { result: AnalyzeResult }) {
               ))}
             </div>
           </section>
+          <ActivationTreePanel execution={result.execution} />
           {result.tac.classLayouts.length > 0 && (
             <section className="min-w-0 space-y-2">
               <h4 className="font-head text-xs uppercase tracking-wide">Layouts de clases</h4>
@@ -184,7 +186,11 @@ function MipsInspector({ result }: { result: AnalyzeResult }) {
         <button type="button" disabled={!exportable} className="rounded border bg-primary px-2 py-1 text-[11px] font-semibold disabled:cursor-not-allowed disabled:opacity-50" onClick={() => exportable && downloadText("compiscript.asm", mips.assembly, "text/plain;charset=utf-8")}>Descargar .asm</button>
       </div>
       <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
-        {[["Estado", mips.status], ["Instrucciones", mips.optimizedInstructionCount], ["Mirilla", mips.optimizationCount], ["Diagnósticos", mips.diagnostics.length], ["TAC fuente", result.tac.instructions.length], ["Registros pico", mips.registerStats.maxConcurrent]].map(([label, value]) => <div key={String(label)} className="rounded border bg-muted/20 p-2"><p className="text-[10px] text-muted-foreground">{label}</p><p className="font-mono text-sm">{value}</p></div>)}
+        {[["Estado", mips.status], ["Instrucciones", `${mips.instructionCount} → ${mips.optimizedInstructionCount}`], ["Eliminadas por mirilla", mips.optimizationCount], ["Diagnósticos", mips.diagnostics.length], ["TAC fuente", result.tac.instructions.length], ["Registros pico", mips.registerStats.maxConcurrent], ["Reusos de registro", mips.registerStats.reuses], ["Desalojos", mips.registerStats.evictions], ["Spills", mips.registerStats.spills]].map(([label, value]) => <div key={String(label)} className="rounded border bg-muted/20 p-2"><p className="text-[10px] text-muted-foreground">{label}</p><p className="font-mono text-sm">{value}</p></div>)}
+      </div>
+      <div className="rounded border bg-muted/20 p-2 text-[11px]">
+        <p className="mb-1 text-[10px] uppercase tracking-wide text-muted-foreground">Reglas de mirilla aplicadas</p>
+        <div className="grid grid-cols-1 gap-x-3 font-mono sm:grid-cols-2">{Object.entries(mips.peephole).map(([rule, count]) => <p key={rule} className={count ? "" : "text-muted-foreground"}>{rule}: {count}</p>)}</div>
       </div>
       {mips.diagnostics.length > 0 && <div role="alert" className="rounded border border-amber-500/40 bg-amber-500/10 p-2 text-xs text-amber-700 dark:text-amber-300">{mips.diagnostics.map((diagnostic, index) => <p key={`${diagnostic.code}-${diagnostic.tacIndex ?? index}`}><strong>{diagnostic.code}</strong>: {diagnostic.message}</p>)}</div>}
       <pre className="max-h-[32rem] overflow-auto rounded-lg border bg-[#0d1217] p-3 font-mono text-[11px] leading-5 text-white/90" aria-label="Ensamblador MIPS generado">{mips.assembly || "No se generó ensamblador válido."}</pre>

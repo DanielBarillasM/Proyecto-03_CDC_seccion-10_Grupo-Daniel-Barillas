@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import path from "path";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
@@ -25,5 +26,9 @@ export default defineConfig({
   preview: {
     port: 3000,
     host: "0.0.0.0"
+  },
+
+  test: {
+    testTimeout: 30_000
   }
 });

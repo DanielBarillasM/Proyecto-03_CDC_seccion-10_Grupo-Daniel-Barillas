@@ -59,8 +59,26 @@ const cases = [
   ["explicit child constructor initializes parent", "class Base { let x: integer = 41; } class Child: Base { let y: integer = 1; function constructor() { this.y = 2; } } let c = new Child(); print(c.x); print(c.y);", "41\n2"],
   ["dynamic method dispatch", "class Base { function value(): integer { return 1; } } class Child: Base { function value(): integer { return 2; } } let item: Base = new Child(); print(item.value());", "2"],
   ["hidden child field keeps a distinct offset", "class Base { let x: integer = 1; function baseValue(): integer { return this.x; } } class Child: Base { let x: float = 2.5; function childValue(): float { return this.x; } } let item = new Child(); print(item.baseValue()); print(item.childValue()); print(item.x);", "1\n2.5\n2.5"],
+  ["register pressure evicts without losing values", "let a: integer = 1; let b: integer = 2; let c: integer = 3; let d: integer = 4; let e: integer = 5; let f: integer = 6; let g: integer = 7; let h: integer = 8; let k: integer = 9; print(a + b + c + d + e + f + g + h + k + a * b * c * d); print(a + b);", "69\n3"],
+  ["register cache is invalidated at loop labels", "let i: integer = 0; let s: integer = 0; while (i < 5) { s = s + i; i = i + 1; } print(s); print(i);", "10\n5"],
+  ["register cache is invalidated after calls", "let g: integer = 1; function bump(): integer { g = g + 10; return g; } let a: integer = g; let b: integer = bump(); print(a + b + g);", "23"],
+  ["independent counters share their own cells", "function crear(base: integer) { let total: integer = base; function sumar(n: integer): integer { total = total + n; return total; } return sumar; } let a = crear(10); let b = crear(100); print(a(1)); print(a(2)); print(b(5)); print(a(3));", "11\n13\n105\n16"],
+  ["exception unwinds nested calls and reaches outer handler", "function g(xs: integer[], i: integer): integer { return xs[i]; } function h(xs: integer[]): integer { return g(xs, 3) + 1; } let uno: integer[] = [1]; let cuatro: integer[] = [1, 2, 3, 4]; try { print(h(uno)); } catch (e) { print(e); } print(h(cuatro)); try { try { print(10 / 0); } catch (inner) { print(\"interno \" + inner); print(g(uno, 9)); } } catch (outer) { print(\"externo \" + outer); } print(\"fin\");", "Runtime error: array index out of bounds\n5\ninterno Runtime error: division by zero\nexterno Runtime error: array index out of bounds\nfin"],
+  ["uncaught error inside nested calls stops the program", "function d(x: integer): integer { return 10 / x; } function w(x: integer): integer { return d(x) + 1; } print(1); print(w(0)); print(2);", "1\nRuntime error: division by zero"],
+  ["float formatting and promotion", "function half(x: float): float { return x / 2.0; } print(half(3)); let f: float = 1.0 / 3.0; print(f); print(1000000.0 * 100.0); print(0.0001); print(-2.5 * 4.0);", "1.5\n0.33333334\n1.0E8\n1.0E-4\n-10.0"],
+  ["mutual recursion", "function par(n: integer): boolean { if (n == 0) { return true; } return impar(n - 1); } function impar(n: integer): boolean { if (n == 0) { return false; } return par(n - 1); } print(par(4)); print(impar(4));", "true\nfalse"],
+  ["bound method keeps its receiver", "class Animal { function sonido(): string { return \"...\"; } function hablar(): string { return this.sonido(); } } class Perro : Animal { function sonido(): string { return \"guau\"; } } let a: Animal = new Animal(); let p: Animal = new Perro(); print(a.hablar()); print(p.hablar()); let f = p.sonido; p = a; print(f());", "...\nguau\nguau"],
   ["uninitialized locals and block shadowing are deterministic", "function value(): integer { let x: integer; return x; } print(value()); let x: integer = 1; { let x: integer = 2; print(x); } print(x);", "0\n2\n1"],
 ] as const;
+
+describe("TAC interpreter output regressions", () => {
+  it.each(cases)("%s", (_name, source, output) => {
+    const result = analyzeInput(source, "mips");
+    const uncaught = /(^|\n)Runtime error:[^\n]*$/.test(output) && !source.includes("catch");
+    expect(result.execution.status).toBe(uncaught ? "uncaught-error" : "completed");
+    expect(result.execution.output.trim()).toBe(output);
+  });
+});
 
 describe.skipIf(!existsSync(jar) || !javaAvailable)("MARS output regressions", () => {
   it.each(cases)("%s", (_name, source, output) => {

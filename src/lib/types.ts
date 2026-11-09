@@ -8,6 +8,7 @@ import type { ScopeInfo } from "../semantic/scopes";
 import type { SemanticTreeNode } from "../semantic/ast";
 import type { TacGenerationResult } from "../tac/types";
 import type { MipsGenerationResult } from "../mips/generator";
+import type { TacExecutionResult } from "../tac/interpreter";
 
 export type AnalysisMode = "valid" | "lexical" | "syntax" | "semantic-error" | "tac" | "mips" | "custom";
 
@@ -102,6 +103,7 @@ export interface AnalyzeResult {
   semantic: SemanticAnalysisResult;
   tac: TacGenerationResult;
   mips: MipsGenerationResult;
+  execution: TacExecutionResult;
   explanation: string;
   summary: {
     tokenCount: number;

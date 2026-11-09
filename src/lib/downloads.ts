@@ -1,6 +1,7 @@
 import { displayType } from "../semantic/semanticTypes";
 import type { AnalyzeResult, TokenInfo } from "./types";
 import type { TacInstruction } from "../tac/types";
+import { formatActivationTree } from "../tac/interpreter";
 
 /** Dispara la descarga de un archivo de texto desde el navegador. */
 export function downloadText(filename: string, content: string, mimeType = "text/plain;charset=utf-8"): void {
@@ -91,7 +92,7 @@ export function tacReportToText(result: AnalyzeResult): string {
     "",
     "=== MARCOS ===",
     ...tac.activationRecords.flatMap((frame) => [
-      `${frame.id} | ${frame.name} | kind=${frame.kind} | parent=${frame.parentFrameId ?? "—"} | slots=${frame.slots.length} | bytes=${frame.totalBytes}`,
+      `${frame.id} | ${frame.name} | kind=${frame.kind} | padre léxico=${frame.parentFrameId ?? "—"} | slots=${frame.slots.length} | bytes=${frame.totalBytes}`,
       ...frame.slots.map((slot) => `  - ${slot.name} | ${slot.kind} | offset=${slot.offset} | size=${slot.size}`)
     ]),
     "",
@@ -99,7 +100,15 @@ export function tacReportToText(result: AnalyzeResult): string {
     ...tac.classLayouts.flatMap((layout) => [
       `${layout.name} | parent=${layout.parentClassId ?? "—"} | bytes=${layout.instanceSize}`,
       ...layout.fields.map((field) => `  - ${field.name} | offset=${field.offset} | size=${field.size}`)
-    ])
+    ]),
+    "",
+    "=== ÁRBOL DE ACTIVACIÓN (EJECUCIÓN DEL TAC) ===",
+    `Estado: ${result.execution.status}${result.execution.message ? ` | ${result.execution.message}` : ""}`,
+    `Pasos: ${result.execution.steps} | Activaciones: ${result.execution.nodeCount} | Profundidad máxima: ${result.execution.maxDepth}`,
+    formatActivationTree(result.execution) || "(sin activaciones)",
+    "",
+    "=== SALIDA DE LA EJECUCIÓN ===",
+    result.execution.output || "(sin salida)"
   ].join("\n");
 }
 

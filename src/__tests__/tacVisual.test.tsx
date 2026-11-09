@@ -31,6 +31,16 @@ describe("TAC visual panel", () => {
     }
   });
 
+  it("renders the runtime activation tree and peephole rule counts", () => {
+    const result = analyzeInput("function fib(n: integer): integer { if (n < 2) { return n; } return fib(n - 1) + fib(n - 2); }\nprint(fib(3));", "mips");
+    const tac = renderToStaticMarkup(<RightDock result={result} inputText="" activeTab="tac" onTabChange={() => {}} onSelectScope={() => {}} />);
+    const mips = renderToStaticMarkup(<RightDock result={result} inputText="" activeTab="mips" onTabChange={() => {}} onSelectScope={() => {}} />);
+    expect(tac).toContain("Árbol de activación (ejecución del TAC)");
+    expect(tac.match(/fib\(\d\)/g)).toHaveLength(5);
+    expect(tac).toContain("→ 2");
+    expect(mips).toContain("store-load-forwarding");
+  });
+
   it("shows the skip reason instead of blocks for rejected input", () => {
     const result = analyzeInput("print(missing);", "tac");
     const markup = renderToStaticMarkup(<RightDock result={result} inputText="" activeTab="visual" onTabChange={() => {}} onSelectScope={() => {}} />);

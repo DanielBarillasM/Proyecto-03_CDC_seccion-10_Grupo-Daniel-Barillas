@@ -22,6 +22,7 @@ import { emptySemanticResult } from "./types";
 import { emptyTacResult } from "../tac/types";
 import { generateTac } from "../tac/generator";
 import { emptyMipsResult, generateMips } from "../mips/generator";
+import { emptyExecutionResult, executeTac } from "../tac/interpreter";
 
 /** Identificador visible del motor usado por la interfaz y la CLI. */
 export const ANALYZER_ENGINE = "ANTLR 4 / antlr4ts (código generado)";
@@ -67,6 +68,7 @@ export function analyzeInput(
       semantic: emptySemanticResult("not-requested"),
       tac: emptyTacResult("not-requested"),
       mips: emptyMipsResult("not-requested", "La fase MIPS no fue solicitada."),
+      execution: emptyExecutionResult("La ejecución TAC no fue solicitada."),
       explanation: buildLexerExplanation(
         accepted,
         tokens.length,
@@ -114,6 +116,7 @@ export function analyzeInput(
         mode === "mips" ? "skipped" : "not-requested",
         mode === "mips" ? "Código MIPS no generado: la estructura del programa excede el límite seguro." : "La fase MIPS no fue solicitada."
       ),
+      execution: emptyExecutionResult("El programa no se ejecutó: la estructura excede el límite seguro."),
       explanation: `El archivo excede la profundidad estructural máxima de ${MAX_STRUCTURAL_DEPTH} niveles.`,
       summary: {
         tokenCount: tokens.length,
@@ -178,6 +181,7 @@ export function analyzeInput(
   const mips = mode === "mips"
     ? generateMips(tac)
     : emptyMipsResult("not-requested", "La fase MIPS no fue solicitada.");
+  const execution = executeTac(tac);
   const tacErrorCount = tac.diagnostics.filter((diagnostic) => diagnostic.severity === "error").length;
   const mipsErrorCount = mips.diagnostics.filter((diagnostic) => diagnostic.severity === "error").length;
   const codeGenerationAccepted =
@@ -198,6 +202,7 @@ export function analyzeInput(
     semantic,
     tac,
     mips,
+    execution,
     explanation: buildExplanation(
       accepted,
       tokens.length,

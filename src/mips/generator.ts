@@ -7,24 +7,61 @@ export interface MipsGenerationResult {
   status: MipsStatus; skipReason?: string; target: "MIPS32 / MARS 4.5";
   assembly: string; unoptimizedAssembly: string; data: string[]; text: string[];
   diagnostics: MipsDiagnostic[]; instructionCount: number; optimizedInstructionCount: number; optimizationCount: number;
-  registerStats: { allocations: number; maxConcurrent: number; spills: number };
+  registerStats: { allocations: number; maxConcurrent: number; spills: number; reuses: number; evictions: number };
+  peephole: Record<PeepholeRuleId, number>;
 }
 
 export function emptyMipsResult(status: MipsStatus = "not-requested", skipReason?: string): MipsGenerationResult {
-  return { status, skipReason, target: "MIPS32 / MARS 4.5", assembly: "", unoptimizedAssembly: "", data: [], text: [], diagnostics: [], instructionCount: 0, optimizedInstructionCount: 0, optimizationCount: 0, registerStats: { allocations: 0, maxConcurrent: 0, spills: 0 } };
+  return { status, skipReason, target: "MIPS32 / MARS 4.5", assembly: "", unoptimizedAssembly: "", data: [], text: [], diagnostics: [], instructionCount: 0, optimizedInstructionCount: 0, optimizationCount: 0, registerStats: { allocations: 0, maxConcurrent: 0, spills: 0, reuses: 0, evictions: 0 }, peephole: Object.fromEntries(PEEPHOLE_RULE_IDS.map((rule) => [rule, 0])) as Record<PeepholeRuleId, number> };
 }
 
-/** Asignador getReg local a cada cuádruplo TAC. */
 class RegisterAllocator {
   private readonly pool = ["$t0", "$t1", "$t2", "$t3", "$t4", "$t5", "$t6", "$t7"];
-  private readonly used = new Set<string>();
-  allocations = 0; maxConcurrent = 0; spills = 0;
-  beginInstruction(): void { this.used.clear(); }
-  getReg(): string {
-    const register = this.pool.find((candidate) => !this.used.has(candidate));
-    if (!register) { this.spills += 1; throw new Error("No hay un registro temporal libre."); }
-    this.used.add(register); this.allocations += 1; this.maxConcurrent = Math.max(this.maxConcurrent, this.used.size);
+  private readonly contents = new Map<string, Set<string>>(this.pool.map((register) => [register, new Set<string>()]));
+  private readonly pinned = new Set<string>();
+  private readonly lastUse = new Map<string, number>();
+  private clock = 0;
+  allocations = 0; maxConcurrent = 0; spills = 0; reuses = 0; evictions = 0;
+
+  beginInstruction(): void { this.pinned.clear(); }
+  reset(): void { this.contents.forEach((keys) => keys.clear()); }
+
+  lookup(key: string): string | undefined {
+    const register = this.pool.find((candidate) => this.contents.get(candidate)?.has(key));
+    if (register) { this.reuses += 1; this.touch(register); }
     return register;
+  }
+
+  getReg(): string {
+    const candidates = this.pool.filter((candidate) => !this.pinned.has(candidate));
+    if (!candidates.length) { this.spills += 1; throw new Error("No hay un registro temporal libre."); }
+    const empty = candidates.find((candidate) => this.contents.get(candidate)?.size === 0);
+    const register = empty ?? candidates.reduce((oldest, candidate) => (this.lastUse.get(candidate) ?? 0) < (this.lastUse.get(oldest) ?? 0) ? candidate : oldest);
+    if (!empty) this.evictions += 1;
+    this.contents.get(register)?.clear();
+    this.touch(register);
+    this.allocations += 1;
+    return register;
+  }
+
+  record(register: string, key: string): void {
+    this.forget(key);
+    this.contents.get(register)?.add(key);
+    this.updatePeak();
+  }
+
+  forget(key: string): void { this.contents.forEach((keys) => keys.delete(key)); }
+  clobber(register: string): void { this.contents.get(register)?.clear(); }
+
+  private touch(register: string): void {
+    this.pinned.add(register);
+    this.lastUse.set(register, ++this.clock);
+    this.updatePeak();
+  }
+
+  private updatePeak(): void {
+    const occupied = this.pool.filter((register) => this.pinned.has(register) || (this.contents.get(register)?.size ?? 0) > 0).length;
+    this.maxConcurrent = Math.max(this.maxConcurrent, occupied);
   }
 }
 
@@ -36,6 +73,8 @@ function opKey(value?: TacOperand): string { return value ? [value.frameId ?? ""
 function primitive(type: SemanticType | undefined, name: string): boolean { return type?.kind === "primitive" && type.name === name; }
 function align(value: number, boundary = 8): number { return Math.ceil(Math.max(0, value) / boundary) * boundary; }
 function countInstructions(lines: string[]): number { return lines.filter((line) => { const text = line.trim(); return text && !text.startsWith("#") && !text.startsWith(".") && !text.endsWith(":"); }).length; }
+const RESET_BEFORE = new Set<TacInstruction["op"]>(["LABEL", "FUNC_BEGIN", "FUNC_END", "CATCH_BEGIN"]);
+const RESET_AFTER = new Set<TacInstruction["op"]>(["CALL", "GOTO", "RETURN"]);
 function quote(value: string): string { return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/\t/g, "\\t")}"`; }
 
 class Generator {
@@ -105,8 +144,10 @@ class Generator {
   generate(): MipsGenerationResult {
     for (const instruction of this.tac.instructions) {
       this.registers.beginInstruction();
+      if (RESET_BEFORE.has(instruction.op)) this.registers.reset();
       try { this.translate(instruction); }
-      catch (error) { this.error("MIPS900", error instanceof Error ? error.message : String(error), instruction); }
+      catch (error) { this.registers.reset(); this.error("MIPS900", error instanceof Error ? error.message : String(error), instruction); }
+      if (RESET_AFTER.has(instruction.op)) this.registers.reset();
     }
     if (this.parameters) this.error("MIPS015", `Quedaron ${this.parameters} parámetros sin llamada asociada.`);
     this.emit("  li $v0, 10", "  syscall");
@@ -123,7 +164,8 @@ class Generator {
       unoptimizedAssembly: [...this.data, "", ...before, ""].join("\n"),
       data: [...this.data], text: optimized.lines, diagnostics: this.diagnostics,
       instructionCount: countInstructions(before), optimizedInstructionCount: countInstructions(optimized.lines), optimizationCount: optimized.removed,
-      registerStats: { allocations: this.registers.allocations, maxConcurrent: this.registers.maxConcurrent, spills: this.registers.spills }
+      registerStats: { allocations: this.registers.allocations, maxConcurrent: this.registers.maxConcurrent, spills: this.registers.spills, reuses: this.registers.reuses, evictions: this.registers.evictions },
+      peephole: optimized.applied
     };
   }
 
@@ -192,12 +234,12 @@ class Generator {
   private move(i: TacInstruction): void {
     if (!i.arg1 || !i.result) return this.error("MIPS002", "MOV incompleto.", i);
     if (primitive(i.result.type, "float")) { this.loadFloat(i.arg1, "$f2", i); this.storeFloat("$f2", i.result, i); return; }
-    const r = this.registers.getReg(); this.loadWord(i.arg1, r, i); this.storeWord(r, i.result, i);
+    this.storeWord(this.operand(i.arg1, i), i.result, i);
   }
   private arithmetic(i: TacInstruction): void {
     if (!i.arg1 || !i.arg2 || !i.result) return this.error("MIPS003", `${i.op} incompleto.`, i);
     if (i.op === "ADD" && (primitive(i.arg1.type, "string") || primitive(i.result.type, "string"))) {
-      this.needsConcat = true; this.loadWord(i.arg1, "$a0", i); this.loadWord(i.arg2, "$a1", i); this.emit("  jal __rt_concat", "  nop"); this.storeWord("$v0", i.result, i); return;
+      this.needsConcat = true; this.loadWord(i.arg1, "$a0", i); this.loadWord(i.arg2, "$a1", i); this.emit("  jal __rt_concat", "  nop"); this.registers.reset(); this.storeWord("$v0", i.result, i); return;
     }
     const floatOperation = primitive(i.arg1.type, "float") || primitive(i.arg2.type, "float") || primitive(i.result.type, "float");
     if (floatOperation && i.op !== "MOD") {
@@ -209,8 +251,7 @@ class Generator {
       const opcode = ({ ADD: "add.s", SUB: "sub.s", MUL: "mul.s", DIV: "div.s" } as Record<string, string>)[i.op];
       this.emit(`  ${opcode} $f6, $f2, $f4`); this.storeFloat("$f6", i.result, i); return;
     }
-    const a = this.registers.getReg(), b = this.registers.getReg(), r = this.registers.getReg();
-    this.loadWord(i.arg1, a, i); this.loadWord(i.arg2, b, i);
+    const a = this.operand(i.arg1, i), b = this.operand(i.arg2, i), r = this.registers.getReg();
     if (i.op === "DIV" || i.op === "MOD") {
       this.needsDivisionChecks = true;
       this.emit(`  beq ${b}, $zero, __rt_throw_div_zero`, "  nop", `  div ${a}, ${b}`, `  ${i.op === "DIV" ? "mflo" : "mfhi"} ${r}`);
@@ -221,13 +262,13 @@ class Generator {
   private unary(i: TacInstruction): void {
     if (!i.arg1 || !i.result) return this.error("MIPS004", `${i.op} incompleto.`, i);
     if (i.op === "NEG" && primitive(i.result.type, "float")) { this.loadFloat(i.arg1, "$f2", i); this.emit("  neg.s $f4, $f2"); this.storeFloat("$f4", i.result, i); return; }
-    const a = this.registers.getReg(), r = this.registers.getReg(); this.loadWord(i.arg1, a, i);
+    const a = this.operand(i.arg1, i), r = this.registers.getReg();
     this.emit(i.op === "NEG" ? `  subu ${r}, $zero, ${a}` : `  sltiu ${r}, ${a}, 1`); this.storeWord(r, i.result, i);
   }
   private comparison(i: TacInstruction): void {
     if (!i.arg1 || !i.arg2 || !i.result) return this.error("MIPS005", `${i.op} incompleto.`, i);
     if ((i.op === "EQ" || i.op === "NE") && (primitive(i.arg1.type, "string") || primitive(i.arg2.type, "string"))) {
-      this.needsStringEquality = true; this.loadWord(i.arg1, "$a0", i); this.loadWord(i.arg2, "$a1", i); this.emit("  jal __rt_streq", "  nop");
+      this.needsStringEquality = true; this.loadWord(i.arg1, "$a0", i); this.loadWord(i.arg2, "$a1", i); this.emit("  jal __rt_streq", "  nop"); this.registers.reset();
       if (i.op === "NE") this.emit("  xori $v0, $v0, 1"); this.storeWord("$v0", i.result, i); return;
     }
     if (primitive(i.arg1.type, "float") || primitive(i.arg2.type, "float")) {
@@ -238,18 +279,18 @@ class Generator {
       this.emit(`  ${rel} ${left}, ${right}`, `  ${i.op === "NE" ? "bc1f" : "bc1t"} ${yes}`, "  nop", "  li $t8, 0", `  j ${end}`, "  nop", `${yes}:`, "  li $t8, 1", `${end}:`);
       this.storeWord("$t8", i.result, i); return;
     }
-    const a = this.registers.getReg(), b = this.registers.getReg(), r = this.registers.getReg(); this.loadWord(i.arg1, a, i); this.loadWord(i.arg2, b, i);
+    const a = this.operand(i.arg1, i), b = this.operand(i.arg2, i), r = this.registers.getReg();
     const operation = ({ EQ: "seq", NE: "sne", LT: "slt", LE: "sle", GT: "sgt", GE: "sge" } as Record<string, string>)[i.op];
     this.emit(`  ${operation} ${r}, ${a}, ${b}`); this.storeWord(r, i.result, i);
   }
   private logic(i: TacInstruction): void {
     if (!i.arg1 || !i.arg2 || !i.result) return this.error("MIPS006", `${i.op} incompleto.`, i);
-    const a = this.registers.getReg(), b = this.registers.getReg(), r = this.registers.getReg(); this.loadWord(i.arg1, a, i); this.loadWord(i.arg2, b, i);
+    const a = this.operand(i.arg1, i), b = this.operand(i.arg2, i), r = this.registers.getReg();
     this.emit(`  ${i.op === "AND" ? "and" : "or"} ${r}, ${a}, ${b}`, `  sne ${r}, ${r}, $zero`); this.storeWord(r, i.result, i);
   }
   private branch(i: TacInstruction): void {
     if (!i.arg1 || !i.result) return this.error("MIPS007", `${i.op} incompleto.`, i);
-    const r = this.registers.getReg(); this.loadWord(i.arg1, r, i); this.emit(`  ${i.op === "IF_TRUE" ? "bne" : "beq"} ${r}, $zero, ${safeLabel(i.result.value)}`, "  nop");
+    const r = this.operand(i.arg1, i); this.emit(`  ${i.op === "IF_TRUE" ? "bne" : "beq"} ${r}, $zero, ${safeLabel(i.result.value)}`, "  nop");
   }
 
   private jump(i: TacInstruction): void {
@@ -295,8 +336,8 @@ class Generator {
   }
   private parameter(i: TacInstruction): void {
     if (!i.arg1) return this.error("MIPS009", "PARAM sin valor.", i);
-    const r = this.registers.getReg();
-    if (primitive(i.arg1.type, "float")) { this.loadFloat(i.arg1, "$f2", i); this.emit(`  mfc1 ${r}, $f2`); } else this.loadWord(i.arg1, r, i);
+    let r: string;
+    if (primitive(i.arg1.type, "float")) { r = this.registers.getReg(); this.loadFloat(i.arg1, "$f2", i); this.emit(`  mfc1 ${r}, $f2`); } else r = this.operand(i.arg1, i);
     this.emit("  addiu $sp, $sp, -4", `  sw ${r}, 0($sp)`); this.parameters += 1;
     this.parameterTypes.push(i.arg1.type);
   }
@@ -317,10 +358,11 @@ class Generator {
     this.emit("  addiu $sp, $sp, -4", "  sw $s7, 0($sp)");
     if (this.functions.has(raw) && !this.findSlot(i.arg1)) this.emit("  move $s7, $zero", `  jal ${safeLabel(raw, "fn")}`, "  nop");
     else {
-      const target = this.registers.getReg(); this.loadWord(i.arg1, target, i);
+      const target = this.operand(i.arg1, i);
       this.emit(`  move $s7, ${target}`, `  lw $t9, 0(${target})`, "  jalr $t9", "  nop");
     }
     this.emit("  lw $s7, 0($sp)", "  addiu $sp, $sp, 4");
+    this.registers.reset();
     const consumed = Math.min(expected, this.parameters);
     if (consumed) this.emit(`  addiu $sp, $sp, ${consumed * 4}`);
     this.parameters -= consumed;
@@ -378,7 +420,7 @@ class Generator {
     if (primitive(i.arg1.type, "string")) { this.loadWord(i.arg1, "$a0", i); this.emit("  li $v0, 4", "  syscall"); }
     else if (primitive(i.arg1.type, "float")) { this.loadFloat(i.arg1, "$f12", i); this.emit("  li $v0, 2", "  syscall"); }
     else if (primitive(i.arg1.type, "boolean")) {
-      const no = this.next("print_false"), end = this.next("print_end"), r = this.registers.getReg(); this.loadWord(i.arg1, r, i);
+      const no = this.next("print_false"), end = this.next("print_end"), r = this.operand(i.arg1, i);
       this.emit(`  beq ${r}, $zero, ${no}`, "  nop", `  la $a0, ${safeLabel("true", "rt")}`, `  j ${end}`, "  nop", `${no}:`, `  la $a0, ${safeLabel("false", "rt")}`, `${end}:`, "  li $v0, 4", "  syscall");
     } else if (primitive(i.arg1.type, "null")) this.emit(`  la $a0, ${safeLabel("null", "rt")}`, "  li $v0, 4", "  syscall");
     else { this.loadWord(i.arg1, "$a0", i); this.emit("  li $v0, 1", "  syscall"); }
@@ -386,23 +428,28 @@ class Generator {
   }
   private newArray(i: TacInstruction): void {
     if (!i.arg1 || !i.result) return this.error("MIPS020", "NEW_ARRAY incompleto.", i);
-    const n = this.registers.getReg(); this.loadWord(i.arg1, n, i); this.emit(`  addiu $a0, ${n}, 1`, "  sll $a0, $a0, 2", "  li $v0, 9", "  syscall", `  sw ${n}, 0($v0)`); this.storeWord("$v0", i.result, i);
+    const n = this.operand(i.arg1, i); this.emit(`  addiu $a0, ${n}, 1`, "  sll $a0, $a0, 2", "  li $v0, 9", "  syscall", `  sw ${n}, 0($v0)`); this.storeWord("$v0", i.result, i);
   }
   private arrayLength(i: TacInstruction): void {
     if (!i.arg1 || !i.result) return this.error("MIPS021", "ARRAY_LENGTH incompleto.", i);
-    const a = this.registers.getReg(), r = this.registers.getReg(); this.loadWord(i.arg1, a, i); this.checkArray(a); this.emit(`  lw ${r}, 0(${a})`); this.storeWord(r, i.result, i);
+    const a = this.operand(i.arg1, i), r = this.registers.getReg(); this.checkArray(a); this.emit(`  lw ${r}, 0(${a})`); this.storeWord(r, i.result, i);
   }
   private arrayGet(i: TacInstruction): void {
     if (!i.arg1 || !i.arg2 || !i.result) return this.error("MIPS022", "ARRAY_GET incompleto.", i);
-    const a = this.registers.getReg(), n = this.registers.getReg(); this.loadWord(i.arg1, a, i); this.loadWord(i.arg2, n, i); this.checkArray(a, n); this.emit(`  addiu ${n}, ${n}, 1`, `  sll ${n}, ${n}, 2`, `  addu ${a}, ${a}, ${n}`);
-    if (primitive(i.result.type, "float")) { this.emit(`  l.s $f2, 0(${a})`); this.storeFloat("$f2", i.result, i); }
-    else { const r = this.registers.getReg(); this.emit(`  lw ${r}, 0(${a})`); this.storeWord(r, i.result, i); }
+    const a = this.operand(i.arg1, i), n = this.operand(i.arg2, i); this.checkArray(a, n); const address = this.elementAddress(a, n);
+    if (primitive(i.result.type, "float")) { this.emit(`  l.s $f2, 0(${address})`); this.storeFloat("$f2", i.result, i); }
+    else { const r = this.registers.getReg(); this.emit(`  lw ${r}, 0(${address})`); this.storeWord(r, i.result, i); }
   }
   private arraySet(i: TacInstruction): void {
     if (!i.arg1 || !i.arg2 || !i.result) return this.error("MIPS023", "ARRAY_SET incompleto.", i);
-    const a = this.registers.getReg(), n = this.registers.getReg(); this.loadWord(i.arg1, a, i); this.loadWord(i.arg2, n, i); this.checkArray(a, n); this.emit(`  addiu ${n}, ${n}, 1`, `  sll ${n}, ${n}, 2`, `  addu ${a}, ${a}, ${n}`);
-    if (primitive(i.arg1.type?.kind === "array" ? i.arg1.type.element : i.result.type, "float")) { this.loadFloat(i.result, "$f2", i); this.emit(`  s.s $f2, 0(${a})`); }
-    else { const r = this.registers.getReg(); this.loadWord(i.result, r, i); this.emit(`  sw ${r}, 0(${a})`); }
+    const a = this.operand(i.arg1, i), n = this.operand(i.arg2, i); this.checkArray(a, n); const address = this.elementAddress(a, n);
+    if (primitive(i.arg1.type?.kind === "array" ? i.arg1.type.element : i.result.type, "float")) { this.loadFloat(i.result, "$f2", i); this.emit(`  s.s $f2, 0(${address})`); }
+    else { const r = this.operand(i.result, i); this.emit(`  sw ${r}, 0(${address})`); }
+  }
+  private elementAddress(base: string, index: string): string {
+    const address = this.registers.getReg();
+    this.emit(`  addiu ${address}, ${index}, 1`, `  sll ${address}, ${address}, 2`, `  addu ${address}, ${base}, ${address}`);
+    return address;
   }
   private checkArray(base: string, index?: string): void {
     this.needsArrayChecks = true;
@@ -426,8 +473,8 @@ class Generator {
     if (!i.arg1 || !i.arg2 || !i.result) return this.error("MIPS026", "GET_FIELD incompleto.", i);
     const layout = this.layout(i.arg1.type), name = String(i.arg2.value), method = layout?.methods?.find((candidate) => candidate.name === name);
     if (method) {
-      const a = this.registers.getReg(), r = this.registers.getReg();
-      this.loadWord(i.arg1, a, i); this.checkObject(a);
+      const a = this.operand(i.arg1, i), r = this.registers.getReg();
+      this.checkObject(a);
       this.emit(
         `  lw ${r}, 0(${a})`,
         `  lw ${r}, ${method.slot * 4}(${r})`,
@@ -442,7 +489,7 @@ class Generator {
     }
     const field = [...(layout?.fields ?? [])].reverse().find((candidate) => candidate.name === name);
     if (!field) return this.error("MIPS027", `Campo o método desconocido: ${name}.`, i);
-    const a = this.registers.getReg(); this.loadWord(i.arg1, a, i); this.checkObject(a);
+    const a = this.operand(i.arg1, i); this.checkObject(a);
     if (primitive(i.result.type, "float")) { this.emit(`  l.s $f2, ${field.offset}(${a})`); this.storeFloat("$f2", i.result, i); }
     else { const r = this.registers.getReg(); this.emit(`  lw ${r}, ${field.offset}(${a})`); this.storeWord(r, i.result, i); }
   }
@@ -450,9 +497,9 @@ class Generator {
     if (!i.arg1 || !i.arg2 || !i.result) return this.error("MIPS028", "SET_FIELD incompleto.", i);
     const field = [...(this.layout(i.arg1.type)?.fields ?? [])].reverse().find((candidate) => candidate.name === String(i.arg2?.value));
     if (!field) return this.error("MIPS029", `Campo desconocido: ${String(i.arg2.value)}.`, i);
-    const a = this.registers.getReg(); this.loadWord(i.arg1, a, i); this.checkObject(a);
+    const a = this.operand(i.arg1, i); this.checkObject(a);
     if (primitive(field.type, "float")) { this.loadFloat(i.result, "$f2", i); this.emit(`  s.s $f2, ${field.offset}(${a})`); }
-    else { const r = this.registers.getReg(); this.loadWord(i.result, r, i); this.emit(`  sw ${r}, ${field.offset}(${a})`); }
+    else { const r = this.operand(i.result, i); this.emit(`  sw ${r}, ${field.offset}(${a})`); }
   }
 
   private makeClosure(i: TacInstruction): void {
@@ -464,7 +511,7 @@ class Generator {
   }
   private capture(i: TacInstruction): void {
     if (!this.activeClosure || !i.arg1 || !i.result) return this.error("MIPS031", "CAPTURE sin cierre activo.", i);
-    const c = this.registers.getReg(), v = this.registers.getReg(); this.loadWord(this.activeClosure, c, i); this.loadCell(i.arg1, v, i); this.emit(`  sw ${v}, ${(Number(i.result.value ?? 0) + 1) * 4}(${c})`);
+    const c = this.operand(this.activeClosure, i), v = this.registers.getReg(); this.loadCell(i.arg1, v, i); this.emit(`  sw ${v}, ${(Number(i.result.value ?? 0) + 1) * 4}(${c})`);
   }
   private loadCapture(i: TacInstruction): void {
     if (!i.result) return this.error("MIPS032", "LOAD_CAPTURE sin resultado.", i);
@@ -472,9 +519,10 @@ class Generator {
   }
   private storeCapture(i: TacInstruction): void {
     if (!i.result) return this.error("MIPS033", "STORE_CAPTURE sin valor.", i);
-    const r = this.registers.getReg(), index = Number(i.arg2?.value ?? i.arg1?.captureIndex ?? 0);
-    if (primitive(i.arg1?.type, "float")) { this.loadFloat(i.result, "$f2", i); this.emit(`  mfc1 ${r}, $f2`); }
-    else this.loadWord(i.result, r, i);
+    const index = Number(i.arg2?.value ?? i.arg1?.captureIndex ?? 0);
+    let r: string;
+    if (primitive(i.arg1?.type, "float")) { r = this.registers.getReg(); this.loadFloat(i.result, "$f2", i); this.emit(`  mfc1 ${r}, $f2`); }
+    else r = this.operand(i.result, i);
     this.emit(`  lw $t9, ${(index + 1) * 4}($s7)`, `  sw ${r}, 0($t9)`);
   }
 
@@ -490,7 +538,32 @@ class Generator {
     else this.error("MIPS043", `No se resolvió la celda de ${String(value.value)}.`, i);
   }
 
+  private cacheKey(value: TacOperand): string | undefined {
+    if (value.kind === "constant") {
+      if (typeof value.value === "string") return `str:${this.stringLabel(value.value)}`;
+      return `const:${value.value === null ? 0 : typeof value.value === "boolean" ? Number(value.value) : Math.trunc(Number(value.value))}`;
+    }
+    if (value.kind === "label") return `addr:${safeLabel(value.value)}`;
+    if (this.isCell(value)) return undefined;
+    const target = this.storage(value);
+    return target ? `mem:${target}` : undefined;
+  }
+  private operand(value: TacOperand, i?: TacInstruction): string {
+    const key = this.cacheKey(value);
+    const cached = key ? this.registers.lookup(key) : undefined;
+    if (cached) return cached;
+    const register = this.registers.getReg();
+    this.loadWord(value, register, i);
+    return register;
+  }
   private loadWord(value: TacOperand, register: string, i?: TacInstruction): void {
+    const key = this.cacheKey(value);
+    const cached = key ? this.registers.lookup(key) : undefined;
+    if (cached) { if (cached !== register) this.emit(`  move ${register}, ${cached}`); return; }
+    this.emitLoad(value, register, i);
+    if (key) this.registers.record(register, key);
+  }
+  private emitLoad(value: TacOperand, register: string, i?: TacInstruction): void {
     if (value.kind === "constant") {
       if (value.value === null) this.emit(`  move ${register}, $zero`);
       else if (typeof value.value === "boolean") this.emit(`  li ${register}, ${value.value ? 1 : 0}`);
@@ -508,17 +581,19 @@ class Generator {
   private storeWord(register: string, value: TacOperand, i?: TacInstruction): void {
     if (this.isCell(value)) { this.loadCell(value, "$t9", i); this.emit(`  sw ${register}, 0($t9)`); return; }
     const target = this.storage(value, true); if (!target) return this.error("MIPS041", `No se asignó almacenamiento para ${String(value.value)}.`, i); this.emit(`  sw ${register}, ${target}`);
+    this.registers.record(register, `mem:${target}`);
   }
   private loadFloat(value: TacOperand, register: string, i?: TacInstruction): void {
     if (value.kind === "constant" && typeof value.value === "number") { this.emit(`  l.s ${register}, ${this.floatLabel(value.value)}`); return; }
     if (this.isCell(value) && primitive(value.type, "float")) { this.loadWord(value, "$t8", i); this.emit(`  mtc1 $t8, ${register}`); return; }
     const target = this.storage(value);
     if (target && primitive(value.type, "float")) { this.emit(`  l.s ${register}, ${target}`); return; }
-    const r = this.registers.getReg(); this.loadWord(value, r, i); this.emit(`  mtc1 ${r}, ${register}`, `  cvt.s.w ${register}, ${register}`);
+    const r = this.operand(value, i); this.emit(`  mtc1 ${r}, ${register}`, `  cvt.s.w ${register}, ${register}`);
   }
   private storeFloat(register: string, value: TacOperand, i?: TacInstruction): void {
     if (this.isCell(value)) { this.loadCell(value, "$t9", i); this.emit(`  s.s ${register}, 0($t9)`); return; }
     const target = this.storage(value, true); if (!target) return this.error("MIPS042", `No se asignó almacenamiento flotante para ${String(value.value)}.`, i); this.emit(`  s.s ${register}, ${target}`);
+    this.registers.forget(`mem:${target}`);
   }
   private layout(type?: SemanticType): ClassLayout | undefined {
     if (type?.kind === "instance") return this.layoutsById.get(type.classId) ?? this.layoutsByName.get(type.className);
@@ -608,14 +683,14 @@ class Generator {
 }
 
 export const PEEPHOLE_RULE_IDS = [
-  "self-move",
-  "zero-addiu",
-  "zero-addu",
-  "zero-subu",
-  "zero-or",
-  "zero-shift",
-  "jump-next-label",
-  "duplicate-nop",
+  "delay-slot-nop",
+  "jump-to-next-label",
+  "unreachable-code",
+  "jump-threading",
+  "store-load-forwarding",
+  "redundant-store",
+  "stack-adjust-merge",
+  "algebraic-identity",
 ] as const;
 
 export type PeepholeRuleId = (typeof PEEPHOLE_RULE_IDS)[number];
@@ -623,36 +698,145 @@ export type PeepholeRuleId = (typeof PEEPHOLE_RULE_IDS)[number];
 export interface PeepholeOptimizationResult {
   lines: string[];
   removed: number;
+  transformations: number;
   applied: Record<PeepholeRuleId, number>;
 }
 
-function matchPeepholeRule(text: string, previous: string | undefined, next: string | undefined): PeepholeRuleId | undefined {
-  if (/^move\s+(\$[A-Za-z0-9]+),\s*\1$/.test(text)) return "self-move";
-  if (/^addiu\s+(\$[A-Za-z0-9]+),\s*\1,\s*0$/.test(text)) return "zero-addiu";
-  if (/^addu\s+(\$[A-Za-z0-9]+),\s*\1,\s*\$zero$/.test(text)) return "zero-addu";
-  if (/^subu\s+(\$[A-Za-z0-9]+),\s*\1,\s*\$zero$/.test(text)) return "zero-subu";
-  if (/^or\s+(\$[A-Za-z0-9]+),\s*\1,\s*\$zero$/.test(text)) return "zero-or";
-  if (/^sll\s+(\$[A-Za-z0-9]+),\s*\1,\s*0$/.test(text)) return "zero-shift";
+const BRANCH = /^(?:j|jal|jr|jalr|b|beq|bne|beqz|bnez|bltz|bgtz|blez|bgez|blt|bgt|ble|bge|bc1t|bc1f)\s/;
+const UNCONDITIONAL = /^(?:j|jr|b)\s/;
+const LABEL_LINE = /^([A-Za-z_][A-Za-z0-9_]*):$/;
 
-  const target = /^j\s+([A-Za-z_][A-Za-z0-9_]*)$/.exec(text)?.[1];
-  const nextLabel = next?.trim().replace(/:$/, "");
-  if (target && target === nextLabel) return "jump-next-label";
-  if (text === "nop" && previous?.trim() === "nop") return "duplicate-nop";
+function isLabel(text: string): boolean { return LABEL_LINE.test(text); }
+function isBarrier(text: string): boolean { return isLabel(text) || text.startsWith("."); }
+
+function branchTarget(text: string): string | undefined {
+  return /^(?:j|b)\s+([A-Za-z_][A-Za-z0-9_]*)$/.exec(text)?.[1]
+    ?? /^(?:beq|bne|blt|bgt|ble|bge)\s+[^,]+,\s*[^,]+,\s*([A-Za-z_][A-Za-z0-9_]*)$/.exec(text)?.[1]
+    ?? /^(?:beqz|bnez|bltz|bgtz|blez|bgez)\s+[^,]+,\s*([A-Za-z_][A-Za-z0-9_]*)$/.exec(text)?.[1]
+    ?? /^(?:bc1t|bc1f)\s+([A-Za-z_][A-Za-z0-9_]*)$/.exec(text)?.[1];
+}
+
+function isAlgebraicIdentity(text: string): boolean {
+  return /^move\s+(\$[A-Za-z0-9]+),\s*\1$/.test(text)
+    || /^addiu\s+(\$[A-Za-z0-9]+),\s*\1,\s*0$/.test(text)
+    || /^(?:addu|subu|or)\s+(\$[A-Za-z0-9]+),\s*\1,\s*\$zero$/.test(text)
+    || /^sll\s+(\$[A-Za-z0-9]+),\s*\1,\s*0$/.test(text);
+}
+
+function finalJumpTarget(lines: string[], label: string): string | undefined {
+  const visited = new Set([label]);
+  let current = label;
+  for (;;) {
+    const next = firstInstructionAfter(lines, current);
+    const target = next ? /^j\s+([A-Za-z_][A-Za-z0-9_]*)$/.exec(next)?.[1] : undefined;
+    if (!target) return current === label ? undefined : current;
+    if (visited.has(target)) return undefined;
+    visited.add(target);
+    current = target;
+  }
+}
+
+function usesRegister(address: string, register: string): boolean {
+  return address.includes(`(${register})`);
+}
+
+function fitsImmediate(value: number): boolean {
+  return value >= -32768 && value <= 32767;
+}
+
+function firstInstructionAfter(lines: string[], label: string): string | undefined {
+  const start = lines.findIndex((line) => line.trim() === `${label}:`);
+  if (start < 0) return undefined;
+  for (let index = start + 1; index < lines.length; index += 1) {
+    const text = lines[index].trim();
+    if (!text || isLabel(text)) continue;
+    return text;
+  }
   return undefined;
 }
 
-/** Optimización de mirilla conservadora sobre ensamblador ya generado. */
-export function peepholeOptimize(lines: string[]): PeepholeOptimizationResult {
+function peepholePass(lines: string[], applied: Record<PeepholeRuleId, number>): string[] {
   const output: string[] = [];
-  const applied = Object.fromEntries(PEEPHOLE_RULE_IDS.map((rule) => [rule, 0])) as Record<PeepholeRuleId, number>;
+  let unreachable = false;
   for (let index = 0; index < lines.length; index += 1) {
-    const line = lines[index], text = line.trim();
-    const rule = matchPeepholeRule(text, output[output.length - 1], lines[index + 1]);
-    if (rule) { applied[rule] += 1; continue; }
+    const line = lines[index];
+    const text = line.trim();
+    const previous = output[output.length - 1]?.trim();
+
+    if (unreachable && !isBarrier(text)) { applied["unreachable-code"] += 1; continue; }
+    unreachable = false;
+
+    if (text === "nop" && previous !== undefined && BRANCH.test(previous)) { applied["delay-slot-nop"] += 1; continue; }
+    if (isAlgebraicIdentity(text)) { applied["algebraic-identity"] += 1; continue; }
+
+    const target = /^j\s+([A-Za-z_][A-Za-z0-9_]*)$/.exec(text)?.[1];
+    if (target) {
+      let cursor = index + 1;
+      let fallsThrough = false;
+      while (cursor < lines.length && isLabel(lines[cursor].trim())) {
+        if (lines[cursor].trim() === `${target}:`) fallsThrough = true;
+        cursor += 1;
+      }
+      if (fallsThrough) { applied["jump-to-next-label"] += 1; continue; }
+    }
+
+    const jumpTarget = branchTarget(text);
+    if (jumpTarget) {
+      const final = finalJumpTarget(lines, jumpTarget);
+      if (final && final !== jumpTarget) {
+        applied["jump-threading"] += 1;
+        output.push(line.replace(new RegExp(`${jumpTarget}$`), final));
+        if (UNCONDITIONAL.test(text)) unreachable = true;
+        continue;
+      }
+    }
+
+    const store = previous ? /^(sw|s\.s)\s+(\$[A-Za-z0-9]+),\s*(.+)$/.exec(previous) : null;
+    const load = /^(lw|l\.s)\s+(\$[A-Za-z0-9]+),\s*(.+)$/.exec(text);
+    if (store && load && store[3] === load[3] && (store[1] === "sw") === (load[1] === "lw")) {
+      applied["store-load-forwarding"] += 1;
+      if (store[2] !== load[2]) output.push(`  ${load[1] === "lw" ? "move" : "mov.s"} ${load[2]}, ${store[2]}`);
+      continue;
+    }
+
+    const loaded = previous ? /^(lw|l\.s)\s+(\$[A-Za-z0-9]+),\s*(.+)$/.exec(previous) : null;
+    const stored = /^(sw|s\.s)\s+(\$[A-Za-z0-9]+),\s*(.+)$/.exec(text);
+    if (loaded && stored && loaded[2] === stored[2] && loaded[3] === stored[3] && !usesRegister(loaded[3], loaded[2]) && (loaded[1] === "lw") === (stored[1] === "sw")) {
+      applied["redundant-store"] += 1;
+      continue;
+    }
+    if (store && stored && store[3] === stored[3] && store[1] === stored[1]) {
+      applied["redundant-store"] += 1;
+      output[output.length - 1] = line;
+      continue;
+    }
+
+    const adjust = previous ? /^addiu\s+(\$[A-Za-z0-9]+),\s*\1,\s*(-?\d+)$/.exec(previous) : null;
+    const nextAdjust = /^addiu\s+(\$[A-Za-z0-9]+),\s*\1,\s*(-?\d+)$/.exec(text);
+    const total = adjust && nextAdjust ? Number(adjust[2]) + Number(nextAdjust[2]) : 0;
+    if (adjust && nextAdjust && adjust[1] === nextAdjust[1] && fitsImmediate(total)) {
+      applied["stack-adjust-merge"] += 1;
+      if (total === 0) output.pop();
+      else output[output.length - 1] = `  addiu ${adjust[1]}, ${adjust[1]}, ${total}`;
+      continue;
+    }
+
     output.push(line);
+    if (UNCONDITIONAL.test(text)) unreachable = true;
   }
-  const removed = Object.values(applied).reduce((total, count) => total + count, 0);
-  return { lines: output, removed, applied };
+  return output;
+}
+
+export function peepholeOptimize(lines: string[]): PeepholeOptimizationResult {
+  const applied = Object.fromEntries(PEEPHOLE_RULE_IDS.map((rule) => [rule, 0])) as Record<PeepholeRuleId, number>;
+  const countApplied = () => Object.values(applied).reduce((total, count) => total + count, 0);
+  let current = [...lines];
+  for (let pass = 0; pass < 20; pass += 1) {
+    const before = countApplied();
+    current = peepholePass(current, applied);
+    if (countApplied() === before) break;
+  }
+  return { lines: current, removed: countInstructions(lines) - countInstructions(current), transformations: countApplied(), applied };
 }
 
 export function generateMips(tac: TacGenerationResult): MipsGenerationResult {
@@ -663,5 +847,5 @@ export function generateMips(tac: TacGenerationResult): MipsGenerationResult {
 }
 
 export function mipsReport(result: MipsGenerationResult): string {
-  return ["Reporte MIPS32 / MARS 4.5", `Estado: ${result.status}`, `Instrucciones antes de mirilla: ${result.instructionCount}`, `Instrucciones finales: ${result.optimizedInstructionCount}`, `Optimizaciones: ${result.optimizationCount}`, `Asignaciones getReg: ${result.registerStats.allocations}`, `Máximo simultáneo: ${result.registerStats.maxConcurrent}`, `Spills: ${result.registerStats.spills}`, `Diagnósticos: ${result.diagnostics.length}`, ...result.diagnostics.map((d) => `${d.severity.toUpperCase()} ${d.code}: ${d.message}`), "", result.assembly].join("\n");
+  return ["Reporte MIPS32 / MARS 4.5", `Estado: ${result.status}`, `Instrucciones antes de mirilla: ${result.instructionCount}`, `Instrucciones finales: ${result.optimizedInstructionCount}`, `Optimizaciones: ${result.optimizationCount}`, `Asignaciones getReg: ${result.registerStats.allocations}`, `Máximo simultáneo: ${result.registerStats.maxConcurrent}`, `Spills: ${result.registerStats.spills}`, `Reusos de registro: ${result.registerStats.reuses}`, `Desalojos: ${result.registerStats.evictions}`, ...PEEPHOLE_RULE_IDS.map((rule) => `Mirilla ${rule}: ${result.peephole[rule]}`), `Diagnósticos: ${result.diagnostics.length}`, ...result.diagnostics.map((d) => `${d.severity.toUpperCase()} ${d.code}: ${d.message}`), "", result.assembly].join("\n");
 }

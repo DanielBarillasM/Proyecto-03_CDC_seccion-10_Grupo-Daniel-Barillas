@@ -608,25 +608,28 @@ jr $ra
 El panel debe mostrar:
 
 - asignaciones realizadas por `getReg()`;
+- valores reutilizados desde registros y desalojos LRU;
 - máximo de registros temporales simultáneos;
 - cantidad de spills;
 - instrucciones antes y después de mirilla;
-- optimizaciones eliminadas.
+- instrucciones eliminadas y aplicaciones de cada regla.
 
-Para ejecutar las pruebas estructurales del backend y la suite dedicada de mirilla:
+En la pestaña TAC, el panel del árbol de activación debe mostrar las llamadas reales de la ejecución. Con `examples/mips/07_recursion.cps`, cada llamada a `fact` aparece como hija de la llamada que la invocó, con su argumento y su valor de retorno. Los registros de activación estáticos siguen apareciendo aparte, con su padre léxico.
+
+Para ejecutar las pruebas estructurales del backend, la suite dedicada de mirilla y la de registros:
 
 ```powershell
-npm.cmd test -- src/__tests__/mips.test.ts src/__tests__/peephole.test.ts
+npm.cmd test -- src/__tests__/mips.test.ts src/__tests__/peephole.test.ts src/__tests__/registers.test.ts
 ```
 
 Resultado esperado:
 
 ```text
-2 archivos aprobados
-25 pruebas aprobadas
+3 archivos aprobados
+32 pruebas aprobadas
 ```
 
-La suite de mirilla comprueba las ocho transformaciones exigibles de forma aislada, confirma que instrucciones parecidas pero necesarias no se eliminan, verifica idempotencia y garantiza que el optimizador no muta la entrada. La suite MARS posterior valida los efectos colaterales sobre la salida observable del programa completo.
+La suite de mirilla comprueba las ocho transformaciones de forma aislada, exige que al menos seis se activen sobre ejemplos reales, confirma que instrucciones parecidas pero necesarias no se eliminan, verifica idempotencia y garantiza que el optimizador no muta la entrada. La suite MARS posterior valida los efectos colaterales sobre la salida observable del programa completo.
 
 ## 8. Tercera auditoría de regresión
 
@@ -727,9 +730,9 @@ Resultado esperado de la versión documentada:
 
 ```text
 TypeScript: aprobado
-Archivos de prueba: 21 aprobados
-Pruebas: 332 aprobadas
-Ejecuciones MARS incluidas: 100
+Archivos de prueba: 23 aprobados
+Pruebas: 412 aprobadas
+Ejecuciones MARS incluidas: 109
 Build de producción: aprobado
 ```
 
@@ -756,5 +759,5 @@ La entrega puede considerarse lista cuando:
 - E06 termina de forma controlada sin una excepción interna de MARS;
 - R01 produce un diagnóstico normal sin bloquear la aplicación;
 - I01 demuestra selección de archivo y resultados dentro de la GUI;
-- la suite completa aprueba 332 pruebas en 21 archivos, incluidas las 100 ejecuciones MARS;
+- la suite completa aprueba 412 pruebas en 23 archivos, incluidas las 109 ejecuciones MARS;
 - el build termina correctamente y la auditoría de dependencias de producción informa cero vulnerabilidades.

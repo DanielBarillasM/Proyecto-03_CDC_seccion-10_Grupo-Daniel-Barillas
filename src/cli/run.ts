@@ -3,6 +3,7 @@ import * as path from "node:path";
 import { styleText } from "node:util";
 import { ANALYZER_ENGINE, analyzeInput } from "../lib/analyze";
 import { displayType } from "../semantic/semanticTypes";
+import { formatActivationTree } from "../tac/interpreter";
 import type { AnalyzerMode } from "../lib/types";
 
 function parseArguments(args: string[]): { file?: string; mode: AnalyzerMode; output?: string } {
@@ -114,6 +115,11 @@ async function main(): Promise<void> {
       console.log(
         `\nInstrucciones: ${result.tac.metrics.instructionCount} | Bloques: ${result.tac.basicBlocks.length} | Aristas: ${result.tac.controlFlowEdges.length} | Temporales: ${result.tac.metrics.temporaryCount} | Reutilizados: ${result.tac.metrics.temporariesReuseCount} | Etiquetas: ${result.tac.metrics.labelCount} | Frames: ${result.tac.metrics.activationRecordCount}`
       );
+      console.log(styleText(["cyan", "bold"], "\nÁrbol de activación (ejecución del TAC):"));
+      console.log(formatActivationTree(result.execution));
+      console.log(`Estado: ${result.execution.status}${result.execution.message ? ` (${result.execution.message})` : ""} | Pasos: ${result.execution.steps} | Activaciones: ${result.execution.nodeCount} | Profundidad: ${result.execution.maxDepth}`);
+      console.log(styleText("cyan", "Salida de la ejecución:"));
+      process.stdout.write(result.execution.output || "(sin salida)\n");
     } else {
       console.log(styleText("yellow", `\nTAC ${result.tac.status}: ${result.tac.skipReason ?? "sin resultado"}`));
     }
@@ -128,7 +134,8 @@ async function main(): Promise<void> {
       }
       console.log(styleText(["green", "bold"], "\nEnsamblador MIPS32 / MARS 4.5:"));
       console.log(result.mips.assembly);
-      console.log(`\nInstrucciones: ${result.mips.optimizedInstructionCount} | Mirilla: ${result.mips.optimizationCount} | Registros pico: ${result.mips.registerStats.maxConcurrent}`);
+      console.log(`\nInstrucciones: ${result.mips.instructionCount} -> ${result.mips.optimizedInstructionCount} | Eliminadas por mirilla: ${result.mips.optimizationCount} | Registros pico: ${result.mips.registerStats.maxConcurrent} | Reusos: ${result.mips.registerStats.reuses} | Desalojos: ${result.mips.registerStats.evictions}`);
+      console.log(`Reglas de mirilla: ${Object.entries(result.mips.peephole).map(([rule, count]) => `${rule}=${count}`).join(", ")}`);
     } else {
       console.log(styleText("red", `\nMIPS ${result.mips.status}: ${result.mips.skipReason ?? "sin resultado"}`));
       result.mips.diagnostics.forEach((diagnostic) => console.log(`  ${diagnostic.code}: ${diagnostic.message}`));

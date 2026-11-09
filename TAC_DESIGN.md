@@ -24,7 +24,7 @@ Las llamadas siguen la convención `PARAM` → `CALL` → `RETURN`. Las funcione
 
 ## Marcos de activación
 
-Cada función tiene un `ActivationRecord` con identificador, ámbito, slots, offsets y tamaño total. Los símbolos locales y parámetros pueden asociarse a un slot con `frameId` y `offset`; esta información queda disponible para backend y exportaciones.
+Cada función tiene un `ActivationRecord` con identificador, ámbito, slots, offsets y tamaño total. Los símbolos locales y parámetros pueden asociarse a un slot con `frameId` y `offset`; esta información queda disponible para backend y exportaciones. El padre de un `ActivationRecord` es léxico: describe dónde se declaró la función. El árbol de activación dinámico, que muestra quién llamó a quién durante una ejecución, lo construye `src/tac/interpreter.ts`.
 
 ## Inspección y exportación
 
@@ -45,7 +45,7 @@ La pestaña TAC muestra métricas, búsqueda textual y filtro por opcode. Las ac
 
 ## Alcance actual y límites
 
-El resultado TAC incluye metadatos de almacenamiento abstracto para símbolos (`frameId`, `offset`, tamaño y alineación), slots capturados para funciones anidadas y layouts iniciales de clases con offsets deterministas. La representación permanece independiente de máquina: no asigna direcciones físicas ni ejecuta el programa.
+El resultado TAC incluye metadatos de almacenamiento abstracto para símbolos (`frameId`, `offset`, tamaño y alineación), slots capturados para funciones anidadas y layouts iniciales de clases con offsets deterministas. La representación permanece independiente de máquina y no asigna direcciones físicas. La ejecución del TAC para obtener el árbol de activación ocurre en un módulo separado.
 
 Las operaciones complejas se conservan como instrucciones intermedias (`ARRAY_GET`, `ARRAY_SET`, `GET_FIELD`, `SET_FIELD`, `NEW_OBJECT`, `TRY_BEGIN`, `CATCH_BEGIN`) para que el backend pueda aplicar posteriormente reglas específicas del runtime sin modificar el frontend del compilador.
 
@@ -101,12 +101,10 @@ Los tamaños utilizados son:
 
 | Tipo | Tamaño |
 |---|---:|
-| boolean | 1 byte |
-| integer | 4 bytes |
-| float | 8 bytes |
-| string, arreglo, objeto, clase o función | 8 bytes |
+| void | 0 bytes |
+| boolean, integer, float, string, arreglo, objeto, clase o función | 4 bytes |
 
-Cada slot se alinea según su tamaño hasta un máximo de 8 bytes. Las direcciones son offsets abstractos, no direcciones físicas.
+Todos los slots ocupan una palabra de MIPS32 y se alinean a 4 bytes. El tamaño total de cada frame y de cada instancia se redondea a 8 bytes. Las direcciones son offsets abstractos, no direcciones físicas.
 
 ## Funciones y frames
 
