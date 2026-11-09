@@ -68,6 +68,14 @@ const cases = [
   ["float formatting and promotion", "function half(x: float): float { return x / 2.0; } print(half(3)); let f: float = 1.0 / 3.0; print(f); print(1000000.0 * 100.0); print(0.0001); print(-2.5 * 4.0);", "1.5\n0.33333334\n1.0E8\n1.0E-4\n-10.0"],
   ["mutual recursion", "function par(n: integer): boolean { if (n == 0) { return true; } return impar(n - 1); } function impar(n: integer): boolean { if (n == 0) { return false; } return par(n - 1); } print(par(4)); print(impar(4));", "true\nfalse"],
   ["bound method keeps its receiver", "class Animal { function sonido(): string { return \"...\"; } function hablar(): string { return this.sonido(); } } class Perro : Animal { function sonido(): string { return \"guau\"; } } let a: Animal = new Animal(); let p: Animal = new Perro(); print(a.hablar()); print(p.hablar()); let f = p.sonido; p = a; print(f());", "...\nguau\nguau"],
+  ["write-back saves a local that the catch block reads", "function f(): integer { let x: integer = 1; try { x = 2; let a: integer[] = [1]; x = a[5]; } catch (e) { return x; } return 0; } print(f());", "2"],
+  ["write-back saves a global modified inside try", "let g: integer = 1; try { g = 2; print(10 / 0); } catch (e) { print(g); }", "2"],
+  ["write-back saves globals before a call", "let g: integer = 1; function f(): integer { return g * 10; } g = 5; print(f()); g = g + 1; print(f());", "50\n60"],
+  ["write-back saves globals before return", "let g: integer = 0; function set(v: integer): integer { g = v + 1; return g; } let r: integer = set(4); print(g); print(r);", "5\n5"],
+  ["write-back keeps loop-carried locals", "function sum(n: integer): integer { let s: integer = 0; let i: integer = 0; while (i < n) { s = s + i; i = i + 1; } return s; } print(sum(5));", "10"],
+  ["spilled locals survive register pressure", "function p(): integer { let a: integer = 1; let b: integer = 2; let c: integer = 3; let d: integer = 4; let e: integer = 5; let f: integer = 6; let g: integer = 7; let h: integer = 8; let k: integer = 9; let m: integer = a + b + c + d + e + f + g + h + k; return m + a * k; } print(p());", "54"],
+  ["ternary temporary is live across blocks", "function t(x: integer): integer { return (x > 2 ? x * 2 : x + 100) + 1; } print(t(3)); print(t(1));", "7\n102"],
+  ["immediate forms at signed 16-bit boundaries", "function k(x: integer): integer { return (x + 32767) + (x - 32768) + x * 8 + (x + 40000) + x * 3 + (x - 0) + 1 * x; } print(k(2));", "40031"],
   ["uninitialized locals and block shadowing are deterministic", "function value(): integer { let x: integer; return x; } print(value()); let x: integer = 1; { let x: integer = 2; print(x); } print(x);", "0\n2\n1"],
 ] as const;
 

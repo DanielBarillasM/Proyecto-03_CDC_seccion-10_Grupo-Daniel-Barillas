@@ -39,7 +39,7 @@ describe("optimización de mirilla MIPS", () => {
     const source = [
       "  move $t0, $t1",
       "  addiu $sp, $sp, 4",
-      "  addu $s0, $s1, $zero",
+      "  addu $s0, $s1, $s2",
       "  sll $t1, $t1, 1",
       "  sw $t0, 0($fp)",
       "  lw $t0, 4($fp)",
@@ -78,6 +78,33 @@ describe("optimización de mirilla MIPS", () => {
     expect(peepholeOptimize(cycle).applied["jump-threading"]).toBe(0);
     expect(peepholeOptimize(baseChange).lines).toEqual(baseChange);
     expect(peepholeOptimize(overflow).lines).toEqual(overflow);
+  });
+
+  it("convierte identidades con destino distinto en move", () => {
+    const result = peepholeOptimize(["  addiu $t0, $t1, 0", "  sll $t2, $t3, 0", "  addu $t4, $zero, $t5", "  or $zero, $t6, $zero"]);
+
+    expect(result.lines).toEqual(["  move $t0, $t1", "  move $t2, $t3", "  move $t4, $t5", "  or $zero, $t6, $zero"]);
+    expect(result.applied["algebraic-identity"]).toBe(3);
+    expect(result.removed).toBe(0);
+  });
+
+  it("elimina un store sobrescrito más adelante sin lecturas intermedias", () => {
+    const result = peepholeOptimize(["  sw $t0, -8($fp)", "  addiu $t1, $t2, 3", "  sw $t3, -12($fp)", "  sw $t1, -8($fp)"]);
+
+    expect(result.lines).toEqual(["  addiu $t1, $t2, 3", "  sw $t3, -12($fp)", "  sw $t1, -8($fp)"]);
+    expect(result.applied["redundant-store"]).toBe(1);
+  });
+
+  it.each([
+    ["una carga intermedia", "  lw $t2, 0($t4)"],
+    ["una etiqueta", "after:"],
+    ["una llamada", "  jal fn_f"],
+    ["una syscall", "  syscall"],
+    ["un cambio de base", "  addiu $fp, $sp, 8"],
+  ])("conserva el store sobrescrito si hay %s", (_label, barrier) => {
+    const source = ["  sw $t0, -8($fp)", barrier, "  sw $t1, -8($fp)"];
+
+    expect(peepholeOptimize(source).applied["redundant-store"]).toBe(0);
   });
 
   it("no muta el arreglo de ensamblador recibido", () => {

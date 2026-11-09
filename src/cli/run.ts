@@ -134,7 +134,7 @@ async function main(): Promise<void> {
       }
       console.log(styleText(["green", "bold"], "\nEnsamblador MIPS32 / MARS 4.5:"));
       console.log(result.mips.assembly);
-      console.log(`\nInstrucciones: ${result.mips.instructionCount} -> ${result.mips.optimizedInstructionCount} | Eliminadas por mirilla: ${result.mips.optimizationCount} | Registros pico: ${result.mips.registerStats.maxConcurrent} | Reusos: ${result.mips.registerStats.reuses} | Desalojos: ${result.mips.registerStats.evictions}`);
+      console.log(`\nInstrucciones: ${result.mips.instructionCount} -> ${result.mips.optimizedInstructionCount} | Eliminadas por mirilla: ${result.mips.optimizationCount} | Registros pico: ${result.mips.registerStats.maxConcurrent} | Reusos: ${result.mips.registerStats.reuses} | Desalojos: ${result.mips.registerStats.evictions} | Spills: ${result.mips.registerStats.spills} | Stores evitados: ${result.mips.registerStats.storesAvoided}`);
       console.log(`Reglas de mirilla: ${Object.entries(result.mips.peephole).map(([rule, count]) => `${rule}=${count}`).join(", ")}`);
     } else {
       console.log(styleText("red", `\nMIPS ${result.mips.status}: ${result.mips.skipReason ?? "sin resultado"}`));

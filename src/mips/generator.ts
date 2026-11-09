@@ -7,24 +7,34 @@ export interface MipsGenerationResult {
   status: MipsStatus; skipReason?: string; target: "MIPS32 / MARS 4.5";
   assembly: string; unoptimizedAssembly: string; data: string[]; text: string[];
   diagnostics: MipsDiagnostic[]; instructionCount: number; optimizedInstructionCount: number; optimizationCount: number;
-  registerStats: { allocations: number; maxConcurrent: number; spills: number; reuses: number; evictions: number };
+  registerStats: { allocations: number; maxConcurrent: number; spills: number; reuses: number; evictions: number; storesAvoided: number };
   peephole: Record<PeepholeRuleId, number>;
 }
 
 export function emptyMipsResult(status: MipsStatus = "not-requested", skipReason?: string): MipsGenerationResult {
-  return { status, skipReason, target: "MIPS32 / MARS 4.5", assembly: "", unoptimizedAssembly: "", data: [], text: [], diagnostics: [], instructionCount: 0, optimizedInstructionCount: 0, optimizationCount: 0, registerStats: { allocations: 0, maxConcurrent: 0, spills: 0, reuses: 0, evictions: 0 }, peephole: Object.fromEntries(PEEPHOLE_RULE_IDS.map((rule) => [rule, 0])) as Record<PeepholeRuleId, number> };
+  return { status, skipReason, target: "MIPS32 / MARS 4.5", assembly: "", unoptimizedAssembly: "", data: [], text: [], diagnostics: [], instructionCount: 0, optimizedInstructionCount: 0, optimizationCount: 0, registerStats: { allocations: 0, maxConcurrent: 0, spills: 0, reuses: 0, evictions: 0, storesAvoided: 0 }, peephole: Object.fromEntries(PEEPHOLE_RULE_IDS.map((rule) => [rule, 0])) as Record<PeepholeRuleId, number> };
+}
+
+interface AllocatorPolicy {
+  isLive(key: string): boolean;
+  nextUse(key: string): number;
+  spill(register: string, key: string): void;
 }
 
 class RegisterAllocator {
   private readonly pool = ["$t0", "$t1", "$t2", "$t3", "$t4", "$t5", "$t6", "$t7"];
-  private readonly contents = new Map<string, Set<string>>(this.pool.map((register) => [register, new Set<string>()]));
+  private readonly contents = new Map<string, Map<string, boolean>>(this.pool.map((register) => [register, new Map<string, boolean>()]));
   private readonly pinned = new Set<string>();
   private readonly lastUse = new Map<string, number>();
   private clock = 0;
-  allocations = 0; maxConcurrent = 0; spills = 0; reuses = 0; evictions = 0;
+  allocations = 0; maxConcurrent = 0; spills = 0; reuses = 0; evictions = 0; storesAvoided = 0;
+
+  constructor(private readonly policy: AllocatorPolicy) {}
 
   beginInstruction(): void { this.pinned.clear(); }
-  reset(): void { this.contents.forEach((keys) => keys.clear()); }
+  reset(): void {
+    this.contents.forEach((keys) => { keys.forEach((dirty) => { if (dirty) this.storesAvoided += 1; }); keys.clear(); });
+  }
 
   lookup(key: string): string | undefined {
     const register = this.pool.find((candidate) => this.contents.get(candidate)?.has(key));
@@ -34,24 +44,48 @@ class RegisterAllocator {
 
   getReg(): string {
     const candidates = this.pool.filter((candidate) => !this.pinned.has(candidate));
-    if (!candidates.length) { this.spills += 1; throw new Error("No hay un registro temporal libre."); }
+    if (!candidates.length) throw new Error("No hay un registro temporal libre.");
     const empty = candidates.find((candidate) => this.contents.get(candidate)?.size === 0);
-    const register = empty ?? candidates.reduce((oldest, candidate) => (this.lastUse.get(candidate) ?? 0) < (this.lastUse.get(oldest) ?? 0) ? candidate : oldest);
-    if (!empty) this.evictions += 1;
+    const register = empty ?? this.victim(candidates);
+    if (!empty) {
+      this.evictions += 1;
+      this.contents.get(register)?.forEach((dirty, key) => {
+        if (!dirty) return;
+        if (this.policy.isLive(key)) { this.policy.spill(register, key); this.spills += 1; }
+        else this.storesAvoided += 1;
+      });
+    }
     this.contents.get(register)?.clear();
     this.touch(register);
     this.allocations += 1;
     return register;
   }
 
-  record(register: string, key: string): void {
+  record(register: string, key: string, dirty = false): void {
     this.forget(key);
-    this.contents.get(register)?.add(key);
+    this.contents.get(register)?.set(key, dirty);
     this.updatePeak();
   }
 
-  forget(key: string): void { this.contents.forEach((keys) => keys.delete(key)); }
-  clobber(register: string): void { this.contents.get(register)?.clear(); }
+  forget(key: string): void {
+    this.contents.forEach((keys) => { if (keys.get(key)) this.storesAvoided += 1; keys.delete(key); });
+  }
+
+  dirtyEntries(): [string, string][] {
+    const entries: [string, string][] = [];
+    this.contents.forEach((keys, register) => keys.forEach((dirty, key) => { if (dirty) entries.push([register, key]); }));
+    return entries;
+  }
+
+  markClean(register: string, key: string): void { if (this.contents.get(register)?.has(key)) this.contents.get(register)?.set(key, false); }
+
+  isPoolRegister(register: string): boolean { return this.contents.has(register); }
+
+  private victim(candidates: string[]): string {
+    const cost = (register: string) => [...(this.contents.get(register) ?? [])].some(([key, dirty]) => dirty && this.policy.isLive(key)) ? 1 : 0;
+    const distance = (register: string) => Math.min(...[...(this.contents.get(register)?.keys() ?? [])].map((key) => this.policy.nextUse(key)));
+    return [...candidates].sort((left, right) => cost(left) - cost(right) || distance(right) - distance(left) || (this.lastUse.get(left) ?? 0) - (this.lastUse.get(right) ?? 0))[0];
+  }
 
   private touch(register: string): void {
     this.pinned.add(register);
@@ -74,14 +108,26 @@ function primitive(type: SemanticType | undefined, name: string): boolean { retu
 function align(value: number, boundary = 8): number { return Math.ceil(Math.max(0, value) / boundary) * boundary; }
 function countInstructions(lines: string[]): number { return lines.filter((line) => { const text = line.trim(); return text && !text.startsWith("#") && !text.startsWith(".") && !text.endsWith(":"); }).length; }
 const RESET_BEFORE = new Set<TacInstruction["op"]>(["LABEL", "FUNC_BEGIN", "FUNC_END", "CATCH_BEGIN"]);
-const RESET_AFTER = new Set<TacInstruction["op"]>(["CALL", "GOTO", "RETURN"]);
+const RESET_AFTER = new Set<TacInstruction["op"]>(["GOTO", "RETURN"]);
+const BLOCK_START = new Set<TacInstruction["op"]>(["LABEL", "FUNC_BEGIN", "FUNC_END", "CATCH_BEGIN"]);
+const BLOCK_END = new Set<TacInstruction["op"]>(["GOTO", "IF_TRUE", "IF_FALSE", "CALL", "RETURN"]);
+const DEFINES = new Set<TacInstruction["op"]>(["MOV", "ADD", "SUB", "MUL", "DIV", "MOD", "NEG", "NOT", "EQ", "NE", "LT", "LE", "GT", "GE", "AND", "OR", "CALL", "NEW_ARRAY", "ARRAY_LENGTH", "ARRAY_GET", "NEW_OBJECT", "GET_FIELD", "MAKE_CLOSURE", "LOAD_CAPTURE", "CATCH_BEGIN"]);
 function quote(value: string): string { return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/\t/g, "\\t")}"`; }
 
 class Generator {
   private readonly data = [".data", `${safeLabel("newline", "rt")}: .asciiz "\\n"`, `${safeLabel("true", "rt")}: .asciiz "true"`, `${safeLabel("false", "rt")}: .asciiz "false"`, `${safeLabel("null", "rt")}: .asciiz "null"`, "__rt_handler: .word 0"];
   private readonly text = [".text", ".globl main", "main:"];
   private readonly diagnostics: MipsDiagnostic[] = [];
-  private readonly registers = new RegisterAllocator();
+  private readonly registers = new RegisterAllocator({
+    isLive: (key) => this.isLive(key, [this.liveIn[this.currentIndex], this.liveOut[this.currentIndex]]),
+    nextUse: (key) => this.nextUse(key),
+    spill: (register, key) => this.emit(`  sw ${register}, ${key.slice(4)}`)
+  });
+  private readonly liveIn: Set<string>[] = [];
+  private readonly liveOut: Set<string>[] = [];
+  private readonly labelIndex = new Map<string, number>();
+  private readonly privateLabels = new Set<string>();
+  private currentIndex = 0;
   private readonly frames = new Map<string, ActivationRecord>();
   private readonly functions = new Map<string, ActivationRecord>();
   private readonly layoutsById = new Map<string, ClassLayout>();
@@ -137,14 +183,114 @@ class Generator {
       for (const slot of frame.slots) {
         const label = safeLabel(`${frame.id}_${slot.symbolId ?? slot.temporary ?? slot.name}`, "mem");
         this.globals.set(this.slotKey(frame, slot), label); this.data.push(`${label}: .word 0`);
+        if (slot.kind === "temporary") this.privateLabels.add(label);
+      }
+    }
+    this.computeLiveness();
+  }
+
+  private computeLiveness(): void {
+    const instructions = this.tac.instructions;
+    const uses: Set<string>[] = [], defs: Set<string>[] = [], successors: number[][] = [];
+    const handlers = new Map<string, string[]>();
+    let closure: TacOperand | undefined;
+    instructions.forEach((instruction, index) => { if (instruction.op === "LABEL" && instruction.result) this.labelIndex.set(String(instruction.result.value), index); });
+    instructions.forEach((instruction, index) => {
+      const frame = instruction.frameId ? this.frames.get(instruction.frameId) : undefined;
+      this.currentFrame = frame?.kind === "global" ? undefined : frame;
+      const used = new Set<string>(), defined = new Set<string>();
+      const add = (set: Set<string>, operand?: TacOperand) => { const key = operand && this.liveKey(operand); if (key) set.add(key); };
+      add(used, instruction.arg1); add(used, instruction.arg2);
+      if (DEFINES.has(instruction.op)) add(defined, instruction.result); else add(used, instruction.result);
+      if (instruction.op === "MAKE_CLOSURE") closure = instruction.result;
+      if (instruction.op === "CAPTURE") add(used, closure);
+      uses.push(used); defs.push(defined);
+      const stack = handlers.get(instruction.frameId ?? "") ?? [];
+      handlers.set(instruction.frameId ?? "", stack);
+      if (instruction.op === "TRY_BEGIN" && instruction.result) stack.push(String(instruction.result.value));
+      const next = instructions[index + 1]?.frameId === instruction.frameId ? [index + 1] : [];
+      const label = (operand?: TacOperand) => operand ? this.labelIndex.get(String(operand.value)) : undefined;
+      const targets: (number | undefined)[] =
+        instruction.op === "GOTO" ? [label(instruction.arg1)]
+          : instruction.op === "IF_TRUE" || instruction.op === "IF_FALSE" ? [label(instruction.result), ...next]
+            : instruction.op === "RETURN" || instruction.op === "FUNC_END" || instruction.op === "PROGRAM_END" ? []
+              : next;
+      if (stack.length) targets.push(this.labelIndex.get(stack[stack.length - 1]));
+      if (instruction.op === "TRY_END") stack.pop();
+      successors.push(targets.filter((target): target is number => target !== undefined));
+    });
+    this.currentFrame = undefined;
+    instructions.forEach(() => { this.liveIn.push(new Set()); this.liveOut.push(new Set()); });
+    for (let changed = true; changed;) {
+      changed = false;
+      for (let index = instructions.length - 1; index >= 0; index -= 1) {
+        const out = this.liveOut[index], before = out.size + this.liveIn[index].size;
+        successors[index].forEach((successor) => this.liveIn[successor].forEach((key) => out.add(key)));
+        uses[index].forEach((key) => this.liveIn[index].add(key));
+        out.forEach((key) => { if (!defs[index].has(key)) this.liveIn[index].add(key); });
+        if (out.size + this.liveIn[index].size !== before) changed = true;
       }
     }
   }
 
+  private liveKey(value: TacOperand): string | undefined {
+    if (value.kind === "constant" || value.kind === "label" || this.isCell(value)) return undefined;
+    const target = this.storage(value);
+    return target ? this.trackedTarget(target) : undefined;
+  }
+  private trackedTarget(target: string): string | undefined {
+    if (target.endsWith("($fp)")) return `${this.currentFrame?.id ?? ""}:${target}`;
+    return this.privateLabels.has(target) ? `L:${target}` : undefined;
+  }
+  private isLive(key: string, sets: (Set<string> | undefined)[]): boolean {
+    if (!key.startsWith("mem:")) return false;
+    const tracked = this.trackedTarget(key.slice(4));
+    return !tracked || sets.some((set) => set?.has(tracked));
+  }
+  private flush(sets: (Set<string> | undefined)[]): void {
+    for (const [register, key] of this.registers.dirtyEntries()) {
+      if (!this.isLive(key, sets)) continue;
+      this.emit(`  sw ${register}, ${key.slice(4)}`);
+      this.registers.markClean(register, key);
+    }
+  }
+  private flushTarget(target: string): void {
+    for (const [register, key] of this.registers.dirtyEntries()) {
+      if (key !== `mem:${target}`) continue;
+      this.emit(`  sw ${register}, ${target}`);
+      this.registers.markClean(register, key);
+    }
+  }
+  private flushBeforeThrow(): void {
+    this.flush(this.activeTryHandlers.length ? [this.liveOut[this.currentIndex]] : []);
+  }
+  private labelLiveIn(label: unknown): (Set<string> | undefined)[] {
+    const index = this.labelIndex.get(String(label));
+    return index === undefined ? [new Set(this.registers.dirtyEntries().map(([, key]) => this.trackedTarget(key.slice(4)) ?? ""))] : [this.liveIn[index]];
+  }
+  private nextUse(key: string): number {
+    const instructions = this.tac.instructions;
+    for (let index = this.currentIndex; index < instructions.length; index += 1) {
+      const instruction = instructions[index];
+      if (index > this.currentIndex && BLOCK_START.has(instruction.op)) return Infinity;
+      const defines = DEFINES.has(instruction.op);
+      const operands = [instruction.arg1, instruction.arg2, defines ? undefined : instruction.result];
+      if (operands.some((operand) => operand && this.peekKey(operand) === key)) return index - this.currentIndex;
+      if (defines && instruction.result && this.peekKey(instruction.result) === key) return Infinity;
+      if (BLOCK_END.has(instruction.op)) return Infinity;
+    }
+    return Infinity;
+  }
+  private peekKey(value: TacOperand): string | undefined {
+    if (value.kind === "constant" && typeof value.value === "string") { const label = this.strings.get(value.value); return label ? `str:${label}` : undefined; }
+    return this.cacheKey(value);
+  }
+
   generate(): MipsGenerationResult {
-    for (const instruction of this.tac.instructions) {
+    for (const [index, instruction] of this.tac.instructions.entries()) {
+      this.currentIndex = index;
       this.registers.beginInstruction();
-      if (RESET_BEFORE.has(instruction.op)) this.registers.reset();
+      if (RESET_BEFORE.has(instruction.op)) { this.flush([this.liveIn[index]]); this.registers.reset(); }
       try { this.translate(instruction); }
       catch (error) { this.registers.reset(); this.error("MIPS900", error instanceof Error ? error.message : String(error), instruction); }
       if (RESET_AFTER.has(instruction.op)) this.registers.reset();
@@ -164,7 +310,7 @@ class Generator {
       unoptimizedAssembly: [...this.data, "", ...before, ""].join("\n"),
       data: [...this.data], text: optimized.lines, diagnostics: this.diagnostics,
       instructionCount: countInstructions(before), optimizedInstructionCount: countInstructions(optimized.lines), optimizationCount: optimized.removed,
-      registerStats: { allocations: this.registers.allocations, maxConcurrent: this.registers.maxConcurrent, spills: this.registers.spills, reuses: this.registers.reuses, evictions: this.registers.evictions },
+      registerStats: { allocations: this.registers.allocations, maxConcurrent: this.registers.maxConcurrent, spills: this.registers.spills, reuses: this.registers.reuses, evictions: this.registers.evictions, storesAvoided: this.registers.storesAvoided },
       peephole: optimized.applied
     };
   }
@@ -239,25 +385,50 @@ class Generator {
   private arithmetic(i: TacInstruction): void {
     if (!i.arg1 || !i.arg2 || !i.result) return this.error("MIPS003", `${i.op} incompleto.`, i);
     if (i.op === "ADD" && (primitive(i.arg1.type, "string") || primitive(i.result.type, "string"))) {
-      this.needsConcat = true; this.loadWord(i.arg1, "$a0", i); this.loadWord(i.arg2, "$a1", i); this.emit("  jal __rt_concat", "  nop"); this.registers.reset(); this.storeWord("$v0", i.result, i); return;
+      this.needsConcat = true; this.loadWord(i.arg1, "$a0", i); this.loadWord(i.arg2, "$a1", i); this.flush([this.liveOut[this.currentIndex]]); this.emit("  jal __rt_concat", "  nop"); this.registers.reset(); this.storeWord("$v0", i.result, i); return;
     }
     const floatOperation = primitive(i.arg1.type, "float") || primitive(i.arg2.type, "float") || primitive(i.result.type, "float");
     if (floatOperation && i.op !== "MOD") {
       this.loadFloat(i.arg1, "$f2", i); this.loadFloat(i.arg2, "$f4", i);
       if (i.op === "DIV") {
         this.needsDivisionChecks = true;
+        this.flushBeforeThrow();
         this.emit("  mtc1 $zero, $f8", "  c.eq.s $f4, $f8", "  bc1t __rt_throw_div_zero", "  nop");
       }
       const opcode = ({ ADD: "add.s", SUB: "sub.s", MUL: "mul.s", DIV: "div.s" } as Record<string, string>)[i.op];
       this.emit(`  ${opcode} $f6, $f2, $f4`); this.storeFloat("$f6", i.result, i); return;
     }
+    const immediate = this.immediateForm(i);
+    if (immediate) { this.storeWord(immediate, i.result, i); return; }
     const a = this.operand(i.arg1, i), b = this.operand(i.arg2, i), r = this.registers.getReg();
     if (i.op === "DIV" || i.op === "MOD") {
       this.needsDivisionChecks = true;
+      this.flushBeforeThrow();
       this.emit(`  beq ${b}, $zero, __rt_throw_div_zero`, "  nop", `  div ${a}, ${b}`, `  ${i.op === "DIV" ? "mflo" : "mfhi"} ${r}`);
     }
     else this.emit(`  ${i.op === "ADD" ? "addu" : i.op === "SUB" ? "subu" : "mul"} ${r}, ${a}, ${b}`);
     this.storeWord(r, i.result, i);
+  }
+  private immediateForm(i: TacInstruction): string | undefined {
+    if (!i.arg1 || !i.arg2) return undefined;
+    const constant = (operand: TacOperand) => operand.kind === "constant" && typeof operand.value === "number" && Number.isInteger(operand.value) ? operand.value : undefined;
+    const swap = (i.op === "ADD" || i.op === "MUL") && constant(i.arg1) !== undefined && constant(i.arg2) === undefined;
+    const [left, right] = swap ? [i.arg2, i.arg1] : [i.arg1, i.arg2];
+    const value = constant(right);
+    if (value === undefined || constant(left) !== undefined) return undefined;
+    if (i.op === "ADD" || i.op === "SUB") {
+      const amount = i.op === "ADD" ? value : -value;
+      if (!fitsImmediate(amount)) return undefined;
+      const a = this.operand(left, i), r = this.registers.getReg();
+      this.emit(`  addiu ${r}, ${a}, ${amount}`);
+      return r;
+    }
+    if (i.op === "MUL" && value > 0 && value <= 2 ** 30 && Number.isInteger(Math.log2(value))) {
+      const a = this.operand(left, i), r = this.registers.getReg();
+      this.emit(`  sll ${r}, ${a}, ${Math.log2(value)}`);
+      return r;
+    }
+    return undefined;
   }
   private unary(i: TacInstruction): void {
     if (!i.arg1 || !i.result) return this.error("MIPS004", `${i.op} incompleto.`, i);
@@ -268,7 +439,7 @@ class Generator {
   private comparison(i: TacInstruction): void {
     if (!i.arg1 || !i.arg2 || !i.result) return this.error("MIPS005", `${i.op} incompleto.`, i);
     if ((i.op === "EQ" || i.op === "NE") && (primitive(i.arg1.type, "string") || primitive(i.arg2.type, "string"))) {
-      this.needsStringEquality = true; this.loadWord(i.arg1, "$a0", i); this.loadWord(i.arg2, "$a1", i); this.emit("  jal __rt_streq", "  nop"); this.registers.reset();
+      this.needsStringEquality = true; this.loadWord(i.arg1, "$a0", i); this.loadWord(i.arg2, "$a1", i); this.flush([this.liveOut[this.currentIndex]]); this.emit("  jal __rt_streq", "  nop"); this.registers.reset();
       if (i.op === "NE") this.emit("  xori $v0, $v0, 1"); this.storeWord("$v0", i.result, i); return;
     }
     if (primitive(i.arg1.type, "float") || primitive(i.arg2.type, "float")) {
@@ -290,12 +461,13 @@ class Generator {
   }
   private branch(i: TacInstruction): void {
     if (!i.arg1 || !i.result) return this.error("MIPS007", `${i.op} incompleto.`, i);
-    const r = this.operand(i.arg1, i); this.emit(`  ${i.op === "IF_TRUE" ? "bne" : "beq"} ${r}, $zero, ${safeLabel(i.result.value)}`, "  nop");
+    const r = this.operand(i.arg1, i); this.flush(this.labelLiveIn(i.result.value)); this.emit(`  ${i.op === "IF_TRUE" ? "bne" : "beq"} ${r}, $zero, ${safeLabel(i.result.value)}`, "  nop");
   }
 
   private jump(i: TacInstruction): void {
     if (!i.arg1) return this.error("MIPS062", "GOTO sin etiqueta de destino.", i);
     const target = String(i.arg1.value);
+    this.flush(this.labelLiveIn(target));
     const targetDepth = this.labelTryDepth.get(target) ?? this.activeTryHandlers.length;
     this.emitHandlerCleanup(Math.max(0, this.activeTryHandlers.length - targetDepth));
     this.emit(`  j ${safeLabel(target)}`, "  nop");
@@ -343,6 +515,7 @@ class Generator {
   }
   private call(i: TacInstruction): void {
     if (!i.arg1) return this.error("MIPS010", "CALL sin destino.", i);
+    this.flush([this.liveOut[this.currentIndex]]);
     const declared = Number(i.arg2?.value ?? this.parameters);
     const expected = Number.isFinite(declared) ? Math.max(0, Math.trunc(declared)) : this.parameters;
     if (expected > this.parameters) this.error("MIPS101", `CALL requiere ${expected} parámetros, pero solo hay ${this.parameters} apilados.`, i);
@@ -373,6 +546,7 @@ class Generator {
   }
   private returnValue(i: TacInstruction): void {
     if (i.arg1) primitive(this.currentFrame?.returnType ?? i.arg1.type, "float") ? this.loadFloat(i.arg1, "$f0", i) : this.loadWord(i.arg1, "$v0", i);
+    this.flush([]);
     this.emitHandlerCleanup(this.activeTryHandlers.length);
     if (this.currentEpilogue) this.emit(`  j ${this.currentEpilogue}`, "  nop"); else this.error("MIPS011", "RETURN fuera de una función.", i);
   }
@@ -453,6 +627,7 @@ class Generator {
   }
   private checkArray(base: string, index?: string): void {
     this.needsArrayChecks = true;
+    this.flushBeforeThrow();
     this.emit(`  beq ${base}, $zero, __rt_throw_null_array`, "  nop");
     if (index) this.emit(`  bltz ${index}, __rt_throw_array_bounds`, "  nop", `  lw $t8, 0(${base})`, `  bge ${index}, $t8, __rt_throw_array_bounds`, "  nop");
   }
@@ -549,6 +724,7 @@ class Generator {
     return target ? `mem:${target}` : undefined;
   }
   private operand(value: TacOperand, i?: TacInstruction): string {
+    if (value.kind === "constant" && (value.value === 0 || value.value === null || value.value === false)) return "$zero";
     const key = this.cacheKey(value);
     const cached = key ? this.registers.lookup(key) : undefined;
     if (cached) return cached;
@@ -580,14 +756,22 @@ class Generator {
   }
   private storeWord(register: string, value: TacOperand, i?: TacInstruction): void {
     if (this.isCell(value)) { this.loadCell(value, "$t9", i); this.emit(`  sw ${register}, 0($t9)`); return; }
-    const target = this.storage(value, true); if (!target) return this.error("MIPS041", `No se asignó almacenamiento para ${String(value.value)}.`, i); this.emit(`  sw ${register}, ${target}`);
-    this.registers.record(register, `mem:${target}`);
+    const target = this.storage(value, true); if (!target) return this.error("MIPS041", `No se asignó almacenamiento para ${String(value.value)}.`, i);
+    if (this.registers.isPoolRegister(register)) { this.registers.record(register, `mem:${target}`, true); return; }
+    if (this.trackedTarget(target)) {
+      const copy = this.registers.getReg();
+      this.emit(`  move ${copy}, ${register}`);
+      this.registers.record(copy, `mem:${target}`, true);
+      return;
+    }
+    this.emit(`  sw ${register}, ${target}`);
+    this.registers.forget(`mem:${target}`);
   }
   private loadFloat(value: TacOperand, register: string, i?: TacInstruction): void {
     if (value.kind === "constant" && typeof value.value === "number") { this.emit(`  l.s ${register}, ${this.floatLabel(value.value)}`); return; }
     if (this.isCell(value) && primitive(value.type, "float")) { this.loadWord(value, "$t8", i); this.emit(`  mtc1 $t8, ${register}`); return; }
     const target = this.storage(value);
-    if (target && primitive(value.type, "float")) { this.emit(`  l.s ${register}, ${target}`); return; }
+    if (target && primitive(value.type, "float")) { this.flushTarget(target); this.emit(`  l.s ${register}, ${target}`); return; }
     const r = this.operand(value, i); this.emit(`  mtc1 ${r}, ${register}`, `  cvt.s.w ${register}, ${register}`);
   }
   private storeFloat(register: string, value: TacOperand, i?: TacInstruction): void {
@@ -603,6 +787,7 @@ class Generator {
   private vtableLabel(layout: ClassLayout): string { return safeLabel(layout.classId, "vtable"); }
   private checkObject(base: string): void {
     this.needsObjectChecks = true;
+    this.flushBeforeThrow();
     this.emit(`  beq ${base}, $zero, __rt_throw_null_object`, "  nop");
   }
   private stringLabel(value: string): string {
@@ -716,11 +901,31 @@ function branchTarget(text: string): string | undefined {
     ?? /^(?:bc1t|bc1f)\s+([A-Za-z_][A-Za-z0-9_]*)$/.exec(text)?.[1];
 }
 
-function isAlgebraicIdentity(text: string): boolean {
-  return /^move\s+(\$[A-Za-z0-9]+),\s*\1$/.test(text)
-    || /^addiu\s+(\$[A-Za-z0-9]+),\s*\1,\s*0$/.test(text)
-    || /^(?:addu|subu|or)\s+(\$[A-Za-z0-9]+),\s*\1,\s*\$zero$/.test(text)
-    || /^sll\s+(\$[A-Za-z0-9]+),\s*\1,\s*0$/.test(text);
+function algebraicIdentity(text: string): { destination: string; source: string } | undefined {
+  const match = /^move\s+(\$[A-Za-z0-9]+),\s*(\$[A-Za-z0-9]+)$/.exec(text)
+    ?? /^(?:addiu|sll|srl|sra)\s+(\$[A-Za-z0-9]+),\s*(\$[A-Za-z0-9]+),\s*0$/.exec(text)
+    ?? /^(?:addu|subu|or|xor)\s+(\$[A-Za-z0-9]+),\s*(\$[A-Za-z0-9]+),\s*\$zero$/.exec(text)
+    ?? /^(?:addu|or|xor)\s+(\$[A-Za-z0-9]+),\s*\$zero,\s*(\$[A-Za-z0-9]+)$/.exec(text);
+  if (!match || match[1] === "$zero") return undefined;
+  if (text.startsWith("move") && match[1] !== match[2]) return undefined;
+  return { destination: match[1], source: match[2] };
+}
+
+const WORD_STORE = /^(sw|s\.s)\s+(\$[A-Za-z0-9]+),\s*(.+)$/;
+const MEMORY_READ = /^l(?!i\s|a\s|ui\s)[a-z0-9.]*\s/;
+const TRAP = /^(?:syscall|break|t[a-z]+)\b/;
+
+function overwrittenBeforeRead(lines: string[], index: number, address: string): boolean {
+  const base = /\((\$[A-Za-z0-9]+)\)$/.exec(address)?.[1];
+  for (let cursor = index + 1; cursor < lines.length; cursor += 1) {
+    const text = lines[cursor].trim();
+    if (!text) continue;
+    const store = WORD_STORE.exec(text);
+    if (store) { if (store[3] === address) return true; continue; }
+    if (isBarrier(text) || BRANCH.test(text) || TRAP.test(text) || MEMORY_READ.test(text)) return false;
+    if (base && text.includes(base)) return false;
+  }
+  return false;
 }
 
 function finalJumpTarget(lines: string[], label: string): string | undefined {
@@ -767,7 +972,12 @@ function peepholePass(lines: string[], applied: Record<PeepholeRuleId, number>):
     unreachable = false;
 
     if (text === "nop" && previous !== undefined && BRANCH.test(previous)) { applied["delay-slot-nop"] += 1; continue; }
-    if (isAlgebraicIdentity(text)) { applied["algebraic-identity"] += 1; continue; }
+    const identity = algebraicIdentity(text);
+    if (identity) {
+      applied["algebraic-identity"] += 1;
+      if (identity.destination !== identity.source) output.push(`  move ${identity.destination}, ${identity.source}`);
+      continue;
+    }
 
     const target = /^j\s+([A-Za-z_][A-Za-z0-9_]*)$/.exec(text)?.[1];
     if (target) {
@@ -805,9 +1015,8 @@ function peepholePass(lines: string[], applied: Record<PeepholeRuleId, number>):
       applied["redundant-store"] += 1;
       continue;
     }
-    if (store && stored && store[3] === stored[3] && store[1] === stored[1]) {
+    if (stored && overwrittenBeforeRead(lines, index, stored[3])) {
       applied["redundant-store"] += 1;
-      output[output.length - 1] = line;
       continue;
     }
 
@@ -847,5 +1056,5 @@ export function generateMips(tac: TacGenerationResult): MipsGenerationResult {
 }
 
 export function mipsReport(result: MipsGenerationResult): string {
-  return ["Reporte MIPS32 / MARS 4.5", `Estado: ${result.status}`, `Instrucciones antes de mirilla: ${result.instructionCount}`, `Instrucciones finales: ${result.optimizedInstructionCount}`, `Optimizaciones: ${result.optimizationCount}`, `Asignaciones getReg: ${result.registerStats.allocations}`, `Máximo simultáneo: ${result.registerStats.maxConcurrent}`, `Spills: ${result.registerStats.spills}`, `Reusos de registro: ${result.registerStats.reuses}`, `Desalojos: ${result.registerStats.evictions}`, ...PEEPHOLE_RULE_IDS.map((rule) => `Mirilla ${rule}: ${result.peephole[rule]}`), `Diagnósticos: ${result.diagnostics.length}`, ...result.diagnostics.map((d) => `${d.severity.toUpperCase()} ${d.code}: ${d.message}`), "", result.assembly].join("\n");
+  return ["Reporte MIPS32 / MARS 4.5", `Estado: ${result.status}`, `Instrucciones antes de mirilla: ${result.instructionCount}`, `Instrucciones finales: ${result.optimizedInstructionCount}`, `Optimizaciones: ${result.optimizationCount}`, `Asignaciones getReg: ${result.registerStats.allocations}`, `Máximo simultáneo: ${result.registerStats.maxConcurrent}`, `Spills: ${result.registerStats.spills}`, `Reusos de registro: ${result.registerStats.reuses}`, `Desalojos: ${result.registerStats.evictions}`, `Stores evitados: ${result.registerStats.storesAvoided}`, ...PEEPHOLE_RULE_IDS.map((rule) => `Mirilla ${rule}: ${result.peephole[rule]}`), `Diagnósticos: ${result.diagnostics.length}`, ...result.diagnostics.map((d) => `${d.severity.toUpperCase()} ${d.code}: ${d.message}`), "", result.assembly].join("\n");
 }

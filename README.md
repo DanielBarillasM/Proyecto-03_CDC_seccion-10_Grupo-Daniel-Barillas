@@ -53,7 +53,7 @@ La aplicación **no ejecuta el ensamblador internamente** ni produce código obj
 | TAC | Cuádruplos tipados, temporales, etiquetas, CFG, frames y layouts de clases |
 | MIPS32 | Aritmética, lógica, comparaciones, control, funciones, recursión, arreglos, objetos, strings, floats y closures |
 | Convención de llamadas | Argumentos en pila, `$sp`, `$fp`, `$ra`, prólogo/epílogo y valor de retorno |
-| Registros | `getReg` con descriptores de registros y direcciones, reutilización dentro del bloque básico y desalojo LRU de `$t0`–`$t7` |
+| Registros | `getReg` con descriptores de registros y direcciones, análisis de vida, política *write-back* y desalojo por próximo uso en `$t0`–`$t7`; reporta spills reales y stores evitados |
 | Memoria | Segmento `.data`, heap mediante syscall 9, frames y entornos de closures |
 | Mirilla | Ocho reglas, seis de ellas activas en los ejemplos reales: `nop` tras saltos, saltos al siguiente bloque, código inalcanzable, cadenas de saltos, *store-load forwarding* y fusión de ajustes de pila |
 | Árbol de activación | Intérprete TAC que registra las llamadas reales de una ejecución, con padre dinámico, argumentos, retornos y estado |
@@ -264,9 +264,9 @@ Validación automatizada:
 | Verificación | Resultado |
 | --- | ---: |
 | TypeScript `tsc --noEmit` | aprobado |
-| Pruebas automatizadas | 412 aprobadas en 23 archivos |
+| Pruebas automatizadas | 440 aprobadas en 23 archivos |
 | Pruebas específicas MIPS | Estructura del ensamblador y salidas de ejecución |
-| Casos ejecutados en MARS 4.5 | 109 salidas reales, con tipos, frames, matrices, closures y referencias de método enlazadas, clases y errores de runtime |
+| Casos ejecutados en MARS 4.5 | 117 salidas reales, con tipos, frames, matrices, closures y referencias de método enlazadas, clases y errores de runtime |
 | Programa integral | `2`, `6`, `12` |
 | Recursión | factorial `120` |
 | Closures | resultado `1` |

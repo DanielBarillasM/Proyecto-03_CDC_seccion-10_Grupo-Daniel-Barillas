@@ -74,21 +74,31 @@ El llamador convierte argumentos `integer` a `float` según la firma y restaura 
 
 1. si el operando ya está en un registro, lo reutiliza sin emitir `lw`, `li` ni `la`;
 2. si no, elige un registro vacío;
-3. si no hay vacíos, desaloja el registro usado hace más tiempo, sin tocar los registros que usa la instrucción actual.
+3. si no hay vacíos, elige una víctima entre los registros que la instrucción actual no usa. Primero prefiere registros cuyos valores ya están en memoria o están muertos. Entre los que aún guardan un valor vivo y modificado, elige el que se usará más tarde según el próximo uso; el uso más reciente solo desempata.
 
-Cada asignación escribe en memoria de inmediato, es decir, la política es *write-through*. Por eso un desalojo nunca necesita guardar el valor: la copia en memoria ya está al día. El contador `spills` solo crecería si una instrucción necesitara más de ocho registros a la vez, lo que no ocurre con TAC de tres direcciones; en ese caso el backend reporta un error en lugar de emitir código incorrecto.
+La política es *write-back*. Una asignación deja el valor en el registro y lo marca como modificado, sin emitir `sw`. El valor se guarda en memoria solo cuando hace falta:
 
-Los descriptores se vacían en los puntos donde el contenido de los registros deja de ser seguro: antes de cada etiqueta, de `FUNC_BEGIN`, `FUNC_END` y `CATCH_BEGIN`, y después de `CALL`, `GOTO`, `RETURN` y de las rutinas de runtime de cadenas. Las celdas compartidas de closures nunca se guardan en el caché porque otra activación puede modificarlas. Las escrituras flotantes invalidan la entrada de su dirección.
+- al desalojar un registro con un valor vivo y modificado; cada `sw` emitido así cuenta como un *spill*;
+- al final de un bloque básico, para los valores vivos a la salida del bloque, antes de saltos, ramas y etiquetas;
+- antes de una llamada, para las globales, que el llamado puede leer, y para los valores vivos después de la llamada;
+- antes de un `RETURN`, para las globales;
+- antes de una instrucción que puede lanzar una excepción dentro de un `try`, para los valores que el `catch` puede leer.
+
+Un valor modificado que muere antes de llegar a uno de esos puntos nunca se escribe. El contador `storesAvoided` cuenta esos casos.
+
+La vida de cada valor se obtiene con un análisis de variables vivas sobre el TAC de cada función. Se calculan conjuntos de entrada y salida por instrucción hasta llegar a un punto fijo. Las aristas siguen el flujo normal, los saltos, las ramas y, de forma conservadora, una arista desde cada instrucción de un `try` hacia su `catch`. Las variables locales y los temporales del frame se rastrean por dirección; las globales se consideran siempre vivas. El próximo uso de un valor se busca hacia adelante dentro del bloque básico.
+
+Los descriptores se vacían en los puntos donde el contenido de los registros deja de ser seguro: antes de cada etiqueta, de `FUNC_BEGIN`, `FUNC_END` y `CATCH_BEGIN`, y después de `CALL`, `GOTO`, `RETURN` y de las rutinas de runtime de cadenas. Las celdas compartidas de closures nunca se guardan en el caché porque otra activación puede modificarlas. Los valores flotantes siguen la política *write-through*: se escriben de inmediato e invalidan la entrada de su dirección.
 
 `$t8` y `$t9` se reservan para soporte de llamadas, comparaciones y punteros de función.
 
-El resultado informa asignaciones totales, máximo simultáneo, reusos, desalojos y spills. En `13_programa_integral.cps` hay 21 reusos; en `valid_complete.cps` hay 56 reusos y 6 desalojos, siempre con cero spills.
+El resultado informa asignaciones totales, máximo simultáneo, reusos, desalojos, spills y stores evitados. En `13_programa_integral.cps` hay 24 reusos y 9 stores evitados; en `valid_complete.cps` hay 71 reusos, 4 desalojos y 36 stores evitados. Los ejemplos no llenan los ocho registros con valores vivos, por lo que no producen spills. Las pruebas con presión de registros sí los producen: una expresión con nueve variables vivas genera 8 spills y su resultado coincide con MARS. En los 20 ejemplos válidos, el `.asm` final pasa de 596 a 447 instrucciones `sw` respecto de la política anterior.
 ## Selección de instrucciones
 
 | TAC | MIPS32 |
 | --- | --- |
-| `MOV` | `li`/`la`/`lw` seguido de `sw` |
-| `ADD`, `SUB`, `MUL` | `addu`, `subu`, `mul` |
+| `MOV` | `li`/`la`/`lw`; el `sw` se difiere según la política *write-back* |
+| `ADD`, `SUB`, `MUL` | `addu`, `subu`, `mul`; con constante de 16 bits, `addiu`; multiplicación por potencia de dos, `sll` |
 | `DIV`, `MOD` | `div` con `mflo` o `mfhi` |
 | comparaciones | `seq`, `sne`, `slt`, `sle`, `sgt`, `sge` |
 | saltos | `j`, `beq`, `bne`; el `nop` posterior se elimina en mirilla |
@@ -131,14 +141,14 @@ Los booleanos se imprimen como `true`/`false` y `null` como texto, no como enter
 3. `unreachable-code`: elimina instrucciones entre un salto incondicional y la siguiente etiqueta;
 4. `jump-threading`: si el destino de un salto es otro `j`, redirige el salto al destino final; no actúa en ciclos de saltos;
 5. `store-load-forwarding`: un `lw` justo después de un `sw` a la misma dirección se reemplaza por `move`, o se elimina si el registro es el mismo; también para `s.s`/`l.s`;
-6. `redundant-store`: elimina un `sw` que guarda el valor recién cargado desde esa dirección, o el primero de dos `sw` seguidos a la misma dirección;
+6. `redundant-store`: elimina un `sw` que guarda el valor recién cargado desde esa dirección, o un `sw` que se sobrescribe más adelante en la misma dirección sin lecturas de memoria, etiquetas, saltos, llamadas, syscalls ni cambios del registro base en medio;
 7. `stack-adjust-merge`: une dos `addiu` consecutivos sobre el mismo registro si la suma cabe en 16 bits, y los elimina si suman cero;
-8. `algebraic-identity`: elimina `move $r, $r`, `addiu $r, $r, 0`, `addu/subu/or $r, $r, $zero` y `sll $r, $r, 0`.
+8. `algebraic-identity`: elimina `move $r, $r` y operaciones neutras con el mismo registro de origen y destino, como `addiu $r, $r, 0`, `addu $r, $r, $zero` o `sll $r, $r, 0`; si el destino es distinto, las reemplaza por `move`.
 
 > [!IMPORTANT]
 > La regla `delay-slot-nop` asume la configuración por defecto de MARS 4.5, que tiene el *delayed branching* desactivado. El `.asm` optimizado no debe ejecutarse con la opción `db` de MARS. El campo `unoptimizedAssembly` conserva la versión con `nop` explícitos.
 
-Sobre los 20 ejemplos válidos y las sondas adicionales, seis reglas se activan en código real: `delay-slot-nop`, `jump-to-next-label`, `unreachable-code`, `jump-threading`, `store-load-forwarding` y `stack-adjust-merge`. `13_programa_integral.cps` baja de 262 a 217 instrucciones y `valid_complete.cps` de 866 a 731. `redundant-store` y `algebraic-identity` están cubiertas por pruebas aisladas, pero el generador actual no produce esos patrones.
+Sobre los 20 ejemplos válidos se activan seis reglas: `delay-slot-nop`, `jump-to-next-label`, `unreachable-code`, `jump-threading`, `store-load-forwarding` y `stack-adjust-merge`. `redundant-store` se activa además una vez en cada grupo de sondas adicionales. `13_programa_integral.cps` baja de 251 a 206 instrucciones y `valid_complete.cps` de 825 a 693. Con *write-back* hay menos pares `sw`/`lw` seguidos, por lo que `store-load-forwarding` se aplica menos que antes. `algebraic-identity` se activa con expresiones como `x + 0` o `x * 1`, cubiertas por pruebas, pero los ejemplos no las contienen. No se agregaron patrones artificiales a los ejemplos para activar reglas.
 
 `optimizationCount` cuenta instrucciones eliminadas, es decir, `instructionCount - optimizedInstructionCount`. El campo `peephole` guarda cuántas veces se aplicó cada regla; una sustitución de `lw` por `move` cuenta como transformación aunque no reduzca instrucciones.
 
@@ -148,11 +158,11 @@ Los registros de activación de `activationRecords` describen la forma de cada f
 
 Cada nodo guarda el frame, los argumentos, el valor de retorno, el padre dinámico y su estado: `returned`, `unwound` si una excepción abandonó la activación, o `active` si la ejecución se detuvo antes. La interpretación tiene límites de 500 000 instrucciones TAC, profundidad 1 000, 16 MiB de heap y 1 000 000 de caracteres de salida. Si alguno se alcanza, el estado pasa a `step-limit`, `depth-limit` o `resource-limit` y las activaciones abiertas quedan como `active`, por lo que el árbol no se presenta como completo. El límite de 2 000 nodos es distinto: solo recorta el árbol guardado, la ejecución continúa, `nodeCount` conserva el total real de llamadas y `truncated` avisa del recorte. Programas con errores del frontend no se ejecutan, y un límite del intérprete no cambia el estado de compilación ni bloquea la exportación del `.asm`.
 
-La salida del intérprete coincide con la de MARS en los 20 ejemplos válidos, en las 51 regresiones de `mips.execution.test.ts` y en las sondas usadas durante la auditoría. La GUI muestra el árbol en la pestaña TAC, la CLI lo imprime en los modos `tac` y `mips`, y el reporte TAC descargable lo incluye.
+La salida del intérprete coincide con la de MARS en los 20 ejemplos válidos, en las 59 regresiones de `mips.execution.test.ts` y en las sondas usadas durante la auditoría. La GUI muestra el árbol en la pestaña TAC, la CLI lo imprime en los modos `tac` y `mips`, y el reporte TAC descargable lo incluye.
 
 ## Validación
 
-Antes de marcar el resultado como completo se verifica que las etiquetas referidas por `j`, `jal`, ramas y `la` estén definidas. La suite dedicada de mirilla ejercita las ocho reglas, falsos positivos, ciclos de saltos, límites de inmediatos, idempotencia, inmutabilidad, métricas y exige al menos seis reglas activas sobre ejemplos reales; las 109 regresiones de salida ejecutadas en MARS 4.5 comprueban que el ensamblador optimizado conserva el comportamiento. `npm run mars:setup` descarga el JAR oficial y verifica su SHA-256. CI usa `REQUIRE_MARS=1` para impedir que se omitan estas pruebas por falta del simulador.
+Antes de marcar el resultado como completo se verifica que las etiquetas referidas por `j`, `jal`, ramas y `la` estén definidas. La suite dedicada de mirilla ejercita las ocho reglas, falsos positivos, ciclos de saltos, límites de inmediatos, idempotencia, inmutabilidad, métricas y exige al menos seis reglas activas sobre ejemplos reales; las 117 regresiones de salida ejecutadas en MARS 4.5 comprueban que el ensamblador optimizado conserva el comportamiento. `npm run mars:setup` descarga el JAR oficial y verifica su SHA-256. CI usa `REQUIRE_MARS=1` para impedir que se omitan estas pruebas por falta del simulador.
 
 ```powershell
 npm.cmd run cli -- examples/mips/07_recursion.cps --mode mips --out factorial.asm

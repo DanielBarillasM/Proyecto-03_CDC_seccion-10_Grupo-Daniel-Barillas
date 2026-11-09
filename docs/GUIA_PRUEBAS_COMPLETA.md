@@ -608,7 +608,7 @@ jr $ra
 El panel debe mostrar:
 
 - asignaciones realizadas por `getReg()`;
-- valores reutilizados desde registros y desalojos LRU;
+- valores reutilizados desde registros, desalojos por próximo uso y stores evitados por *write-back*;
 - máximo de registros temporales simultáneos;
 - cantidad de spills;
 - instrucciones antes y después de mirilla;
@@ -731,8 +731,8 @@ Resultado esperado de la versión documentada:
 ```text
 TypeScript: aprobado
 Archivos de prueba: 23 aprobados
-Pruebas: 412 aprobadas
-Ejecuciones MARS incluidas: 109
+Pruebas: 440 aprobadas
+Ejecuciones MARS incluidas: 117
 Build de producción: aprobado
 ```
 
@@ -759,5 +759,5 @@ La entrega puede considerarse lista cuando:
 - E06 termina de forma controlada sin una excepción interna de MARS;
 - R01 produce un diagnóstico normal sin bloquear la aplicación;
 - I01 demuestra selección de archivo y resultados dentro de la GUI;
-- la suite completa aprueba 412 pruebas en 23 archivos, incluidas las 109 ejecuciones MARS;
+- la suite completa aprueba 440 pruebas en 23 archivos, incluidas las 117 ejecuciones MARS;
 - el build termina correctamente y la auditoría de dependencias de producción informa cero vulnerabilidades.

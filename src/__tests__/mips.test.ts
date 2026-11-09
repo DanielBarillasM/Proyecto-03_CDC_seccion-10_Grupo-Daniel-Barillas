@@ -54,7 +54,7 @@ describe("backend MIPS32 / MARS", () => {
     expect(result.mips.status).toBe("completed");
     expect(result.mips.assembly).toContain("__rt_throw_div_zero:");
     expect(result.mips.assembly).toContain("__rt_throw_null_object:");
-    expect(result.mips.assembly).toMatch(/beq \$t\d, \$zero, __rt_throw_div_zero/);
+    expect(result.mips.assembly).toMatch(/beq \$(?:t\d|zero), \$zero, __rt_throw_div_zero/);
     expect(result.mips.assembly).toMatch(/beq \$t\d, \$zero, __rt_throw_null_object/);
   });
 
