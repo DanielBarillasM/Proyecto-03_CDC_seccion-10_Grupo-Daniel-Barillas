@@ -62,7 +62,7 @@ Resultado verificado:
 - TypeScript aprobado;
 - 448 pruebas aprobadas en 23 archivos, incluidos 119 casos ejecutados en MARS 4.5;
 - build Vite aprobado;
-- auditoría de dependencias de producción: 0 vulnerabilidades; la cadena opcional de empaquetado Electron reporta 15 avisos moderados upstream de `minimatch`, sin una corrección no disruptiva publicada;
+- auditoría de dependencias de producción: 0 vulnerabilidades; la cadena opcional de empaquetado Electron reporta 6 avisos moderados upstream de `minimatch`, sin una corrección no disruptiva publicada;
 - CLI TAC y MIPS ejecutadas correctamente;
 - workflow preparado para exigir los 119 casos MARS con Java 17.
 
@@ -77,6 +77,7 @@ Una revisión contra el enunciado y la rúbrica encontró cuatro problemas que l
 | El contador de spills nunca registraba un spill real y todos los valores se escribían en memoria de inmediato | Los stores se difieren hasta un desalojo de un valor vivo, el final del bloque, una llamada, un retorno o una instrucción que puede lanzar dentro de un `try`; se añadieron `addiu` y `sll` con inmediatos | Una prueba de presión produce 8 spills reales; en los ejemplos el número de `sw` baja de 596 a 447 y las salidas coinciden con MARS |
 | El "árbol de activación" era la cadena léxica de frames | Intérprete TAC que registra el árbol dinámico de llamadas de una ejecución | `interpreter.test.ts`, panel de la pestaña TAC, CLI y reporte descargable |
 | Una prueba MARS fallaba de forma intermitente por el tiempo límite de 5 s de Vitest | Tiempo límite global de 30 s | Suite completa estable con `REQUIRE_MARS=1` |
+| Una ejecución TAC ilimitada o un árbol profundamente recursivo podía bloquear la GUI | Límites defensivos de recursos, recorrido iterativo y máximo de 300 nodos montados en la vista | Regresión de DOM acotado en `tacVisual.test.tsx`; el reporte conserva hasta 1 000 nodos |
 
 El ensamblador optimizado requiere ejecutar MARS con *delayed branching* desactivado, que es su configuración por defecto.
 

@@ -40,7 +40,19 @@ export interface TacExecutionResult {
   limits: TacExecutionLimits;
 }
 
-export const DEFAULT_EXECUTION_LIMITS: TacExecutionLimits = { maxSteps: 500_000, maxDepth: 100_000, maxNodes: 2_000, maxHeapBytes: 16 * 1024 * 1024, maxOutputChars: 1_000_000 };
+/**
+ * Límites defensivos de la demostración del TAC. La ejecución ocurre durante
+ * el análisis en la interfaz, por lo que deben ser suficientemente amplios
+ * para los ejemplos de la rúbrica sin permitir que un programa accidentalmente
+ * infinito monopolice el hilo principal o genere una salida desmedida.
+ */
+export const DEFAULT_EXECUTION_LIMITS: TacExecutionLimits = {
+  maxSteps: 200_000,
+  maxDepth: 20_000,
+  maxNodes: 1_000,
+  maxHeapBytes: 16 * 1024 * 1024,
+  maxOutputChars: 250_000
+};
 
 export const emptyExecutionResult = (message = "El programa no se ejecutó porque no hay TAC válido."): TacExecutionResult => ({
   status: "not-run", message, output: "", steps: 0, nodes: [], nodeCount: 0, maxDepth: 0, truncated: false, limits: DEFAULT_EXECUTION_LIMITS
@@ -634,16 +646,23 @@ export function executeTac(tac: TacGenerationResult, limits: Partial<TacExecutio
 export function formatActivationTree(execution: TacExecutionResult): string {
   const byId = new Map(execution.nodes.map((node) => [node.id, node]));
   const lines: string[] = [];
-  const visit = (node: ActivationTreeNode, prefix: string, last: boolean, root: boolean) => {
+  const root = execution.nodes.find((node) => node.parentId === null);
+  if (!root) return "";
+
+  const pending: { node: ActivationTreeNode; prefix: string; last: boolean; root: boolean }[] = [
+    { node: root, prefix: "", last: true, root: true }
+  ];
+  while (pending.length > 0) {
+    const { node, prefix, last, root: isRoot } = pending.pop()!;
     const returned = node.returnValue !== undefined ? ` → ${node.returnValue}` : "";
     const status = node.status === "returned" ? "" : ` [${node.status === "unwound" ? "desenrollada" : "activa"}]`;
-    lines.push(`${root ? "" : `${prefix}${last ? "└─ " : "├─ "}`}${node.name}(${node.arguments.join(", ")})${returned}${status}`);
-    node.children.forEach((childId, index) => {
+    lines.push(`${isRoot ? "" : `${prefix}${last ? "└─ " : "├─ "}`}${node.name}(${node.arguments.join(", ")})${returned}${status}`);
+    const childPrefix = isRoot ? "" : `${prefix}${last ? "   " : "│  "}`;
+    for (let index = node.children.length - 1; index >= 0; index -= 1) {
+      const childId = node.children[index];
       const child = byId.get(childId);
-      if (child) visit(child, root ? "" : `${prefix}${last ? "   " : "│  "}`, index === node.children.length - 1, false);
-    });
-  };
-  const root = execution.nodes.find((node) => node.parentId === null);
-  if (root) visit(root, "", true, true);
+      if (child) pending.push({ node: child, prefix: childPrefix, last: index === node.children.length - 1, root: false });
+    }
+  }
   return lines.join("\n");
 }

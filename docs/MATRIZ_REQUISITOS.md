@@ -19,7 +19,7 @@ Esta matriz relaciona las instrucciones de generación de código ensamblador co
 | No TAC/MIPS con errores previos | `skipped` y ensamblador vacío | prueba "bloquea TAC y MIPS" | Cubierto |
 | Optimización de mirilla | ocho reglas locales conservadoras; seis se activan en el ensamblador de los ejemplos reales y `redundant-store` en sondas adicionales | `peepholeOptimize`, suite dedicada con prueba de efectividad real y 119 regresiones MARS | Cubierto |
 | Ensamblador válido | segmentos, etiquetas y opcodes MIPS32 | 119 ejecuciones MARS | Cubierto |
-| Árbol de activación | árbol dinámico de llamadas de una ejecución concreta | `executeTac`, `ActivationTreePanel`, CLI e `interpreter.test.ts` | Cubierto |
+| Árbol de activación | árbol dinámico de llamadas de una ejecución concreta, con límites de recursos y renderizado iterativo acotado | `executeTac`, `ActivationTreePanel`, CLI, `interpreter.test.ts` y `tacVisual.test.tsx` | Cubierto |
 | Ejecución con herramienta externa | runner Java configurable | `scripts/run-mars.mjs` | Cubierto |
 | No ejecución interna requerida | UI genera/exporta; MARS es externo | diseño y documentación | Cubierto |
 
@@ -85,7 +85,7 @@ La tabla usa los criterios y ponderaciones de la rúbrica oficial. "Cubierto" si
 | `npm run check` | aprobado |
 | `npm test` | 448 aprobadas en 23 archivos, incluidas 119 ejecuciones MARS |
 | `npm run build` | aprobado |
-| dependencias de producción | 0 vulnerabilidades en `npm audit --omit=dev`; 15 avisos moderados upstream aislados en el empaquetador de desarrollo |
+| dependencias de producción | 0 vulnerabilidades en `npm audit --omit=dev`; 6 avisos moderados upstream aislados en el empaquetador de desarrollo |
 | MARS 4.5 | 119 casos aprobados; CI los exige con Java 17 |
 | errores previos | TAC/MIPS omitidos |
 | backend inconsistente | estado `failed`, descarga deshabilitada |

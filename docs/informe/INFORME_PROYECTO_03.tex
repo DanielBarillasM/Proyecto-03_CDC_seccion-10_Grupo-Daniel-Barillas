@@ -264,7 +264,7 @@ Un registro de activaci\'on no es solo espacio temporal. Es la frontera entre un
 
 Los registros de activaci\'on describen la forma de cada frame y su padre l\'exico. El \'arbol de activaci\'on es distinto: contiene un nodo por cada llamada real durante una ejecuci\'on, y el padre de cada nodo es la llamada que lo invoc\'o. Para construirlo, \archivo{src/tac/interpreter.ts} interpreta el TAC una vez con la misma sem\'antica que el backend: enteros de 32 bits, flotantes de precisi\'on simple, closures, despacho din\'amico y manejadores \codigo{try/catch}.
 
-Cada nodo guarda argumentos, valor de retorno y estado: retorn\'o, fue desenrollado por una excepci\'on o qued\'o activo si la ejecuci\'on se detuvo. La ejecuci\'on se limita a 500\,000 instrucciones TAC, profundidad 100\,000, 16 MiB de heap y un mill\'on de caracteres de salida; si se alcanza un l\'imite, el resultado lo indica y no presenta el \'arbol como completo. La salida del int\'erprete coincide con la de MARS en los ejemplos v\'alidos y en las regresiones de ejecuci\'on. El \'arbol aparece en la pesta\~na TAC, en la CLI y en el reporte descargable.
+Cada nodo guarda argumentos, valor de retorno y estado: retorn\'o, fue desenrollado por una excepci\'on o qued\'o activo si la ejecuci\'on se detuvo. La ejecuci\'on se limita a 200\,000 instrucciones TAC, profundidad 20\,000, 16 MiB de heap, 250\,000 caracteres de salida y 1\,000 nodos capturados; si se alcanza un l\'imite, el resultado lo indica y no presenta el \'arbol como completo. El formateador y la interfaz recorren la estructura iterativamente, y la GUI monta como m\'aximo 300 nodos para evitar desbordamientos de pila o una carga excesiva del DOM sin perder las m\'etricas reales. La salida del int\'erprete coincide con la de MARS en los ejemplos v\'alidos y en las regresiones de ejecuci\'on. El \'arbol aparece en la pesta\~na TAC, en la CLI y en el reporte descargable.
 
 \section{Heap, referencias y tiempo de vida}
 
@@ -779,7 +779,7 @@ npm run cli:mips
 npm audit --omit=dev
 \end{verbatim}
 
-TypeScript, 329 pruebas independientes de herramientas externas y el build terminan correctamente; los 119 escenarios MARS tambi\'en fueron ejecutados y son obligatorios en CI. La auditor\'ia de dependencias distribuidas reporta cero vulnerabilidades. La cadena opcional de empaquetado Electron conserva 15 avisos moderados transitivos de \codigo{minimatch}; no afectan el runtime generado y la correcci\'on autom\'atica propuesta exige una degradaci\'on mayor incompatible, por lo que el riesgo queda aislado y documentado.
+TypeScript, 329 pruebas independientes de herramientas externas y el build terminan correctamente; los 119 escenarios MARS tambi\'en fueron ejecutados y son obligatorios en CI. La auditor\'ia de dependencias distribuidas reporta cero vulnerabilidades. La cadena opcional de empaquetado Electron conserva 6 avisos moderados transitivos de \codigo{minimatch}; no afectan el runtime generado y la correcci\'on autom\'atica propuesta exige una degradaci\'on mayor incompatible, por lo que el riesgo queda aislado y documentado.
 
 \section{Interpretaci\'on de resultados}
 
@@ -857,7 +857,7 @@ Compiscript no expone una sentencia \codigo{throw} de usuario; sin embargo, el b
 
 La memoria de heap se obtiene mediante syscall 9 y no se libera, porque MARS no ofrece un recolector de basura integrado y el alcance no exige administraci\'on manual completa. Esta decisi\'on es adecuada para programas educativos de duraci\'on limitada, pero no para procesos de larga vida con asignaci\'on intensiva.
 
-No existe una fase global de optimizaci\'on, de acuerdo con el alcance: se aplica mirilla local. Cada asignaci\'on se escribe de inmediato en su slot y los registros solo conservan copias dentro de un bloque b\'asico. Esta estrategia es robusta y explicable, pero sacrifica parte del rendimiento frente a una asignaci\'on global basada en liveness.
+No existe una fase global de optimizaci\'on, de acuerdo con el alcance: se aplica mirilla local. El backend s\'i usa an\'alisis de vida y una pol\'itica \emph{write-back} dentro de los bloques b\'asicos; conserva valores en registros y escribe un valor modificado solo cuando debe sobrevivir a un desalojo, salto, llamada, retorno o posible excepci\'on. No implementa coloraci\'on global del grafo de interferencias ni reordenamiento entre bloques, que quedar\'ian fuera del alcance actual.
 
 MARS implementa un entorno educativo y syscalls particulares; el ensamblador generado est\'a orientado a esa compatibilidad. Portarlo a Linux MIPS o a hardware real requerir\'ia revisar ABI, syscalls, formato ejecutable y enlazado.
 

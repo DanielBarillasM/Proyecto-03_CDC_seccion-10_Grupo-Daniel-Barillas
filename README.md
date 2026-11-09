@@ -38,7 +38,7 @@ Compiscript (.cps)
 > [!IMPORTANT]
 > Si existe al menos un error léxico, sintáctico o semántico, no se genera TAC ni ensamblador. Si el backend detecta un error interno o una referencia sin resolver, el resultado MIPS queda en estado `failed` y la interfaz deshabilita la exportación.
 
-La aplicación **no ejecuta el ensamblador internamente** ni produce código objeto. El `.asm` se copia, descarga o guarda y se ejecuta con MARS, tal como permite el enunciado. Para construir el árbol de activación, la aplicación sí interpreta el TAC una vez con límites de pasos, profundidad, heap y salida.
+La aplicación **no ejecuta el ensamblador internamente** ni produce código objeto. El `.asm` se copia, descarga o guarda y se ejecuta con MARS, tal como permite el enunciado. Para construir el árbol de activación, la aplicación sí interpreta el TAC una vez con límites defensivos de pasos, profundidad, heap, salida y nodos capturados. La GUI aplana el árbol y monta como máximo 300 nodos para evitar recursión profunda o una carga excesiva del DOM; el reporte exportable conserva hasta 1 000 activaciones.
 
 > [!WARNING]
 > El ensamblador optimizado asume la configuración por defecto de MARS, con *delayed branching* desactivado. No se debe ejecutar con la opción `db`, porque la mirilla elimina los `nop` posteriores a saltos y ramas.

@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { analyzeInput } from "../lib/analyze";
+import { MAX_VISIBLE_ACTIVATIONS } from "../ui/components/ActivationTreePanel";
 import { RightDock } from "../ui/components/RightDock";
 
 describe("TAC visual panel", () => {
@@ -39,6 +40,28 @@ describe("TAC visual panel", () => {
     expect(tac.match(/fib\(\d\)/g)).toHaveLength(5);
     expect(tac).toContain("→ 2");
     expect(mips).toContain("store-load-forwarding");
+
+    const boundedResult = analyzeInput("print(1);", "mips");
+    const count = MAX_VISIBLE_ACTIVATIONS + 50;
+    boundedResult.execution.nodes = Array.from({ length: count }, (_, index) => ({
+      id: index,
+      parentId: index === 0 ? null : index - 1,
+      frameId: "global",
+      name: index === 0 ? "global" : "recursive",
+      kind: index === 0 ? "global" : "function",
+      depth: index,
+      arguments: [],
+      status: "returned",
+      enterStep: index,
+      exitStep: count + index,
+      children: index + 1 < count ? [index + 1] : []
+    }));
+    boundedResult.execution.nodeCount = count;
+    boundedResult.execution.maxDepth = count - 1;
+    const markup = renderToStaticMarkup(<RightDock result={boundedResult} inputText="" activeTab="tac" onTabChange={() => {}} onSelectScope={() => {}} />);
+    expect(markup.match(/role="treeitem"/g)).toHaveLength(MAX_VISIBLE_ACTIVATIONS);
+    expect(markup).toContain(`La vista está limitada a ${MAX_VISIBLE_ACTIVATIONS} nodos`);
+    expect(markup).toContain(`Profundidad</p><p class="font-mono text-sm">${count - 1}`);
   });
 
   it("shows the skip reason instead of blocks for rejected input", () => {

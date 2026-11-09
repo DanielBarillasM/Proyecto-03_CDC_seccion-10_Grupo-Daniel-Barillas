@@ -614,7 +614,7 @@ El panel debe mostrar:
 - instrucciones antes y después de mirilla;
 - instrucciones eliminadas y aplicaciones de cada regla.
 
-En la pestaña TAC, el panel del árbol de activación debe mostrar las llamadas reales de la ejecución. Con `examples/mips/07_recursion.cps`, cada llamada a `fact` aparece como hija de la llamada que la invocó, con su argumento y su valor de retorno. Los registros de activación estáticos siguen apareciendo aparte, con su padre léxico.
+En la pestaña TAC, el panel del árbol de activación debe mostrar las llamadas reales de la ejecución. Con `examples/mips/07_recursion.cps`, cada llamada a `fact` aparece como hija de la llamada que la invocó, con su argumento y su valor de retorno. Los registros de activación estáticos siguen apareciendo aparte, con su padre léxico. La ejecución demostrativa se detiene de forma controlada al alcanzar sus límites de pasos, profundidad, heap o salida; la GUI monta como máximo 300 nodos mediante un recorrido iterativo y avisa cuando la vista o la captura fueron recortadas.
 
 Para ejecutar las pruebas estructurales del backend, la suite dedicada de mirilla y la de registros:
 
@@ -748,7 +748,7 @@ Resultado de producción esperado:
 found 0 vulnerabilities
 ```
 
-El comando anterior debe ejecutarse como `npm.cmd audit --omit=dev --audit-level=moderate`. La auditoría completa reporta actualmente 15 avisos moderados en herramientas transitivas de `electron-builder` por `minimatch`; no forman parte del runtime distribuido y la única corrección automática propuesta por npm es una degradación mayor incompatible, por lo que se documentan en lugar de aplicar `--force`.
+El comando anterior debe ejecutarse como `npm.cmd audit --omit=dev --audit-level=moderate`. La auditoría completa reporta actualmente 6 avisos moderados en herramientas transitivas de `electron-builder` por `minimatch`; no forman parte del runtime distribuido y la única corrección automática propuesta por npm es una degradación mayor incompatible, por lo que se documentan en lugar de aplicar `--force`.
 
 ## 13. Criterio de aceptación final
 
