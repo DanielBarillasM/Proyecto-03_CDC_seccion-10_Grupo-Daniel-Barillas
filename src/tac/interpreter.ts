@@ -40,7 +40,7 @@ export interface TacExecutionResult {
   limits: TacExecutionLimits;
 }
 
-export const DEFAULT_EXECUTION_LIMITS: TacExecutionLimits = { maxSteps: 500_000, maxDepth: 1_000, maxNodes: 2_000, maxHeapBytes: 16 * 1024 * 1024, maxOutputChars: 1_000_000 };
+export const DEFAULT_EXECUTION_LIMITS: TacExecutionLimits = { maxSteps: 500_000, maxDepth: 100_000, maxNodes: 2_000, maxHeapBytes: 16 * 1024 * 1024, maxOutputChars: 1_000_000 };
 
 export const emptyExecutionResult = (message = "El programa no se ejecutó porque no hay TAC válido."): TacExecutionResult => ({
   status: "not-run", message, output: "", steps: 0, nodes: [], nodeCount: 0, maxDepth: 0, truncated: false, limits: DEFAULT_EXECUTION_LIMITS

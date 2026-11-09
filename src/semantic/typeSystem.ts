@@ -7,6 +7,7 @@
 // cascada de diagnósticos no relacionados.
 
 import {
+  type InstanceSemanticType,
   type SemanticType,
   T,
   displayType,
@@ -25,6 +26,25 @@ import {
  * analizador. `isSubclassOf(child, parent)` debe responder si `child`
  * hereda (directa o transitivamente) de `parent`. */
 export type ClassHierarchyLookup = (child: string, parent: string) => boolean;
+
+export type ParentClassLookup = (instance: InstanceSemanticType) => InstanceSemanticType | undefined;
+
+function closestCommonAncestor(
+  left: InstanceSemanticType,
+  right: InstanceSemanticType,
+  parentOf: ParentClassLookup
+): InstanceSemanticType | undefined {
+  const ancestors = new Set<string>();
+  for (let current: InstanceSemanticType | undefined = left; current && !ancestors.has(current.classId); current = parentOf(current)) {
+    ancestors.add(current.classId);
+  }
+  const visited = new Set<string>();
+  for (let current: InstanceSemanticType | undefined = right; current && !visited.has(current.classId); current = parentOf(current)) {
+    if (ancestors.has(current.classId)) return current;
+    visited.add(current.classId);
+  }
+  return undefined;
+}
 
 /**
  * isAssignable
@@ -124,10 +144,12 @@ export function numericResult(left: SemanticType, right: SemanticType): Semantic
  *
  * Tipo común de una lista de tipos (usado para arreglos literales). Si
  * todos son iguales, ese es el tipo común. Si son numéricos mixtos
- * (integer/float), el común es `float`. En cualquier otro caso de mezcla
- * no hay tipo común y se devuelve `null`.
+ * (integer/float), el común es `float`. Si son instancias de clases
+ * distintas y se recibe `parentOf`, el común es la superclase más cercana
+ * que comparten. En cualquier otro caso de mezcla no hay tipo común y se
+ * devuelve `null`.
  */
-export function commonType(types: SemanticType[]): SemanticType | null {
+export function commonType(types: SemanticType[], parentOf?: ParentClassLookup): SemanticType | null {
   if (types.length === 0) return T.unknown;
 
   const nonAbsorbing = types.filter((type) => !isAbsorbing(type));
@@ -138,6 +160,11 @@ export function commonType(types: SemanticType[]): SemanticType | null {
     if (typesEqual(acc, type)) continue;
     if (isNumeric(acc) && isNumeric(type)) {
       acc = T.float;
+      continue;
+    }
+    const shared = parentOf && isInstanceType(acc) && isInstanceType(type) ? closestCommonAncestor(acc, type, parentOf) : undefined;
+    if (shared) {
+      acc = shared;
       continue;
     }
     return null;

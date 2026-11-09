@@ -607,6 +607,35 @@ describe("Análisis semántico — ámbitos de clases e inferencia", () => {
     expect(result.accepted).toBe(false);
   });
 
+  it("acepta literales de arreglo polimórficos porque no tienen alias", () => {
+    const result = analyze(`
+      class Animal { let n: integer = 1; }
+      class Perro: Animal { let p: integer = 2; }
+      class Gato: Animal { let g: integer = 3; }
+      class Cachorro: Perro { let c: integer = 4; }
+      function recibir(lista: Animal[]): integer { return 1; }
+      function crear(): Animal[] { return [new Perro()]; }
+      let mixtos = [new Perro(), new Gato(), new Cachorro()];
+      let anotados: Animal[] = mixtos;
+      let uno: Animal[] = [new Perro()];
+      let matriz: Animal[][] = [[new Perro()], [new Gato()]];
+      let elegido = true ? new Cachorro() : new Gato();
+      let comoAnimal: Animal = elegido;
+      uno = [new Cachorro()];
+      recibir([new Gato()]);
+    `);
+
+    expect(result.semantic.errors).toEqual([]);
+    expect(result.accepted).toBe(true);
+    expect(result.semantic.symbols.find((symbol) => symbol.name === "mixtos")?.type).toMatchObject({ kind: "array", element: { kind: "instance", className: "Animal" } });
+  });
+
+  it("sigue rechazando arreglos sin superclase común o mezclados con primitivos", () => {
+    expect(codesOf(`class A { let x: integer = 1; } class B { let y: integer = 2; } let m = [new A(), new B()];`)).toContain("SEM017");
+    expect(codesOf(`class A { let x: integer = 1; } let m = [new A(), 1];`)).toContain("SEM017");
+    expect(codesOf(`class A { let x: integer = 1; } class B: A { let y: integer = 2; } let bs: B[] = [new A()];`)).toContain("SEM003");
+  });
+
   it("rechaza sobrescrituras cuya firma rompería el slot heredado de la vtable", () => {
     const result = analyze(`
       class Hija: Base {

@@ -28,6 +28,18 @@ describe("TAC core", () => {
     expect(tacReportToText(result)).toContain("MARCOS");
   });
 
+  it("types nested polymorphic array literals with their closest shared class", () => {
+    const source = "class Animal { function hablar(): string { return \"...\"; } } class Perro : Animal { } class Gato : Animal { } let m = [[new Perro()], [new Gato(), new Animal()]];";
+    const result = analyzeInput(source, "tac");
+    expect(result.tac.status).toBe("completed");
+    const outer = result.tac.instructions.find((instruction) => instruction.op === "NEW_ARRAY")?.result?.type;
+    expect(outer?.kind).toBe("array");
+    const row = outer?.kind === "array" ? outer.element : undefined;
+    expect(row?.kind).toBe("array");
+    const element = row?.kind === "array" ? row.element : undefined;
+    expect(element?.kind === "instance" ? element.className : element?.kind).toBe("Animal");
+  });
+
   it("represents switch and try-catch control flow", () => {
     const result = analyzeInput("let x: integer = 1; switch (x) { case 1: print(x); break; default: print(0); } try { print(x); } catch (error) { print(error); }", "tac");
     const opcodes = result.tac.instructions.map((instruction) => instruction.op);

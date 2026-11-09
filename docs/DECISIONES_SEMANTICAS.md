@@ -60,6 +60,8 @@ No se convierten implícitamente números, booleanos u objetos a `string`.
 
 Los arreglos son mutables y, por ello, su asignabilidad es invariante: `Hija[]` no puede asignarse a `Base[]`, aunque `Hija` herede de `Base`. Esto impide que una referencia aparentemente `Base[]` escriba una instancia incompatible dentro del arreglo original.
 
+Un literal de arreglo nuevo es la excepción, porque todavía no tiene otra referencia. `let lista: Base[] = [new Hija()];` es válido si cada elemento puede asignarse a `Base`, también dentro de literales anidados, argumentos, retornos y campos. Si un literal mezcla instancias de clases distintas, su tipo es el arreglo de la superclase común más cercana: `[new Perro(), new Gato()]` es `Animal[]`. El operador ternario aplica la misma regla. Si no existe una superclase común, o se mezclan instancias con primitivos, se mantiene `SEM017`.
+
 ## 7. Ámbitos y shadowing
 
 Se crean ámbitos para:

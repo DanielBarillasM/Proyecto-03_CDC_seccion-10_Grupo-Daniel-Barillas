@@ -117,12 +117,25 @@ describe("intérprete TAC y árbol de activación", () => {
 
   it("corta ciclos infinitos y recursión sin fin con límites explícitos", () => {
     const loop = run("let i: integer = 0;\nwhile (true) { i = i + 1; }");
-    const recursion = run("function f(n: integer): integer { return f(n + 1); }\nprint(f(0));");
+    const endless = analyzeInput("function f(n: integer): integer { return f(n + 1); }\nprint(f(0));", "mips");
+    const recursion = executeTac(endless.tac, { maxDepth: 1_000 });
 
     expect(loop.status).toBe("step-limit");
     expect(loop.message).toContain("límite");
+    expect(["step-limit", "depth-limit"]).toContain(endless.execution.status);
     expect(recursion.status).toBe("depth-limit");
     expect(recursion.maxDepth).toBe(recursion.limits.maxDepth - 1);
+  });
+
+  it("completa recursiones profundas que MARS sí ejecuta", () => {
+    const execution = run("function suma(n: integer): integer { if (n == 0) { return 0; } return n + suma(n - 1); }\nprint(suma(3000));");
+
+    expect(execution.status).toBe("completed");
+    expect(execution.output).toBe("4501500\n");
+    expect(execution.maxDepth).toBe(3001);
+    expect(execution.nodeCount).toBe(3002);
+    expect(execution.truncated).toBe(true);
+    expect(formatActivationTree(execution).split("\n").length).toBe(execution.limits.maxNodes);
   });
 
   it("corta reservas de heap y salidas sin límite", () => {

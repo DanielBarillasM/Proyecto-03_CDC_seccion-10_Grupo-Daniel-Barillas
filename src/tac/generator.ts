@@ -36,7 +36,7 @@ import type {
 import type { SemanticAnalysisResult } from "../lib/types";
 import type { ScopeInfo, ScopeKind } from "../semantic/scopes";
 import type { SymbolEntry } from "../semantic/symbols";
-import { T, type SemanticType } from "../semantic/semanticTypes";
+import { T, type InstanceSemanticType, type SemanticType } from "../semantic/semanticTypes";
 import { commonType } from "../semantic/typeSystem";
 import { LabelFactory, TemporaryAllocator, type Temporary } from "./allocators";
 import { buildTacControlFlow } from "./controlFlow";
@@ -104,6 +104,11 @@ class TacGenerator {
   private currentScopeId: string;
   private currentFrameId: string;
   private nextInstruction = 0;
+  private readonly parentClass = (instance: InstanceSemanticType): InstanceSemanticType | undefined => {
+    const layout = this.classLayouts.find((candidate) => candidate.classId === instance.classId);
+    const parent = layout?.parentClassId ? this.classLayouts.find((candidate) => candidate.classId === layout.parentClassId) : undefined;
+    return parent ? T.instance(parent.name, parent.classId) : undefined;
+  };
 
   constructor(
     private readonly program: ProgramContext,
@@ -744,7 +749,7 @@ class TacGenerator {
     this.emit("GOTO", { arg1: tacOperand(endLabel, "label") }, ctx);
     this.emit("LABEL", { result: tacOperand(falseLabel, "label") }, ctx);
     const whenFalse = this.expression(branches[1]);
-    result.type = commonType([whenTrue.type ?? T.unknown, whenFalse.type ?? T.unknown]) ?? T.unknown;
+    result.type = commonType([whenTrue.type ?? T.unknown, whenFalse.type ?? T.unknown], this.parentClass) ?? T.unknown;
     this.emit("MOV", { arg1: whenFalse, result }, branches[1]);
     this.release(whenFalse);
     this.emit("LABEL", { result: tacOperand(endLabel, "label") }, ctx);
@@ -912,8 +917,17 @@ class TacGenerator {
       this.emit("ARRAY_SET", { arg1: result, arg2: tacOperand(index), result: value }, expression);
       this.release(value);
     });
-    result.type = T.array(commonType(elementTypes) ?? T.unknown);
+    result.type = T.array(this.literalElementType(elementTypes));
     return result;
+  }
+
+  private literalElementType(types: SemanticType[]): SemanticType {
+    const common = commonType(types, this.parentClass);
+    if (common) return common;
+    if (types.length > 0 && types.every((type) => type.kind === "array")) {
+      return T.array(this.literalElementType(types.map((type) => (type.kind === "array" ? type.element : T.unknown))));
+    }
+    return T.unknown;
   }
 
   private primaryAtom(ctx: PrimaryAtomContext): TacOperand {

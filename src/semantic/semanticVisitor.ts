@@ -79,6 +79,7 @@ import {
   isArrayType,
   isFunctionType,
   typesEqual,
+  type InstanceSemanticType,
   type SemanticType
 } from "./semanticTypes";
 import {
@@ -108,6 +109,7 @@ interface ExprResult {
   /** Metadatos del destino cuando la expresión termina en un campo o método. */
   mutableTarget?: boolean;
   targetLabel?: string;
+  literalElements?: ExprResult[];
 }
 
 /** Contexto de la función actualmente visitada (para validar `return`,
@@ -177,6 +179,23 @@ class SemanticAnalyzer extends AbstractParseTreeVisitor<SemanticTreeNode> implem
 
   private isSubclass(child: string, ancestor: string): boolean {
     return isSubclassOf(this.classRegistry.byId, child, ancestor);
+  }
+
+  private readonly parentClass = (instance: InstanceSemanticType): InstanceSemanticType | undefined => {
+    const parent = this.classRegistry.byId.get(instance.classId)?.parent;
+    return parent ? T.instance(parent.name, parent.id) : undefined;
+  };
+
+  private literalCommonType(elements: ExprResult[]): SemanticType | null {
+    const merged = commonType(elements.map((element) => element.type), this.parentClass);
+    if (merged || !elements.every((element) => element.literalElements)) return merged;
+    const inner = this.literalCommonType(elements.flatMap((element) => element.literalElements!));
+    return inner ? T.array(inner) : null;
+  }
+
+  private accepts(target: SemanticType, value: ExprResult): boolean {
+    if (isAssignable(target, value.type, (c, p) => this.isSubclass(c, p))) return true;
+    return Boolean(value.literalElements) && isArrayType(target) && value.literalElements!.every((element) => this.accepts(target.element, element));
   }
 
   private resolveClass(name: string): ClassInfo | undefined {
@@ -407,16 +426,18 @@ class SemanticAnalyzer extends AbstractParseTreeVisitor<SemanticTreeNode> implem
     const declaredType = typeAnnotation ? this.resolveSemanticType(typeAnnotation.type()) : undefined;
 
     let initType: SemanticType | undefined;
+    let initResult: ExprResult | undefined;
     let initNode: SemanticTreeNode | undefined;
     if (ctx.initializer()) {
       const result = this.evaluateExpression(ctx.initializer()!.expression());
+      initResult = result;
       initType = result.type;
       initNode = result.node;
     }
 
     let finalType: SemanticType = declaredType ?? initType ?? T.unknown;
 
-    if (declaredType && initType && !isAssignable(declaredType, initType, (c, p) => this.isSubclass(c, p))) {
+    if (declaredType && initType && initResult && !this.accepts(declaredType, initResult)) {
       this.report(
         "SEM003",
         "error",
@@ -470,7 +491,7 @@ class SemanticAnalyzer extends AbstractParseTreeVisitor<SemanticTreeNode> implem
     const initResult = this.evaluateExpression(ctx.expression());
     let finalType = declaredType ?? initResult.type;
 
-    if (declaredType && !isAssignable(declaredType, initResult.type, (c, p) => this.isSubclass(c, p))) {
+    if (declaredType && !this.accepts(declaredType, initResult)) {
       this.report(
         "SEM003",
         "error",
@@ -584,7 +605,7 @@ class SemanticAnalyzer extends AbstractParseTreeVisitor<SemanticTreeNode> implem
       if (functionContext.observedReturnTypes.length === 0) {
         finalReturnType = T.void;
       } else {
-        finalReturnType = commonType(functionContext.observedReturnTypes) ?? T.unknown;
+        finalReturnType = commonType(functionContext.observedReturnTypes, this.parentClass) ?? T.unknown;
       }
       if (symbol) {
         symbol.returnType = finalReturnType;
@@ -692,7 +713,7 @@ class SemanticAnalyzer extends AbstractParseTreeVisitor<SemanticTreeNode> implem
     if (ctx.initializer()) {
       const result = this.evaluateExpression(ctx.initializer()!.expression());
       initNode = result.node;
-      if (field && ctx.typeAnnotation() && !isAssignable(field.type, result.type, (c, p) => this.isSubclass(c, p))) {
+      if (field && ctx.typeAnnotation() && !this.accepts(field.type, result)) {
         this.report("SEM003", "error", locOf(ctx), `El campo '${name}' no admite un valor de tipo '${displayType(result.type)}'.`, { symbol: name });
       } else if (field && !ctx.typeAnnotation()) {
         field.type = result.type;
@@ -717,7 +738,7 @@ class SemanticAnalyzer extends AbstractParseTreeVisitor<SemanticTreeNode> implem
     const symbol = this.scopes.resolveLocal(name, this.scopes.currentScopeId());
     const result = this.evaluateExpression(ctx.expression());
 
-    if (field && ctx.typeAnnotation() && !isAssignable(field.type, result.type, (c, p) => this.isSubclass(c, p))) {
+    if (field && ctx.typeAnnotation() && !this.accepts(field.type, result)) {
       this.report("SEM003", "error", locOf(ctx), `La constante de clase '${name}' no admite un valor de tipo '${displayType(result.type)}'.`, { symbol: name });
     } else if (field && !ctx.typeAnnotation()) {
       field.type = result.type;
@@ -953,7 +974,7 @@ class SemanticAnalyzer extends AbstractParseTreeVisitor<SemanticTreeNode> implem
 
     const result = this.evaluateExpression(ctx.expression()!);
     current.observedReturnTypes.push(result.type);
-    if (current.hasExplicitReturnType && !isAssignable(current.returnType, result.type, (c, p) => this.isSubclass(c, p))) {
+    if (current.hasExplicitReturnType && !this.accepts(current.returnType, result)) {
       this.report(
         "SEM008",
         "error",
@@ -999,7 +1020,7 @@ class SemanticAnalyzer extends AbstractParseTreeVisitor<SemanticTreeNode> implem
       this.scopes.markInitialized(target.symbol.id);
     }
 
-    if (!isAssignable(target.type, value.type, (c, p) => this.isSubclass(c, p))) {
+    if (!this.accepts(target.type, value)) {
       this.report(
         "SEM003",
         "error",
@@ -1023,7 +1044,7 @@ class SemanticAnalyzer extends AbstractParseTreeVisitor<SemanticTreeNode> implem
     const thenResult = this.evaluateExpression(expressions[0]);
     const elseResult = this.evaluateExpression(expressions[1]);
 
-    const merged = commonType([thenResult.type, elseResult.type]);
+    const merged = commonType([thenResult.type, elseResult.type], this.parentClass);
     const resultType = merged ?? T.unknown;
     if (!merged) {
       this.report(
@@ -1265,7 +1286,7 @@ class SemanticAnalyzer extends AbstractParseTreeVisitor<SemanticTreeNode> implem
       return { type: T.array(T.unknown), node: createSemanticNode("array-literal", "[]", { location: loc, inferredType: "unknown[]" }) };
     }
 
-    const merged = commonType(elements.map((e) => e.type));
+    const merged = this.literalCommonType(elements);
     if (!merged) {
       this.report("SEM017", "error", loc, "Los elementos del arreglo tienen tipos incompatibles.");
     }
@@ -1277,7 +1298,8 @@ class SemanticAnalyzer extends AbstractParseTreeVisitor<SemanticTreeNode> implem
         location: loc,
         inferredType: displayType(arrayType),
         children: elements.map((e) => e.node)
-      })
+      }),
+      literalElements: elements
     };
   }
 
@@ -1509,7 +1531,7 @@ class SemanticAnalyzer extends AbstractParseTreeVisitor<SemanticTreeNode> implem
       return;
     }
     for (let i = 0; i < params.length; i++) {
-      if (!isAssignable(params[i].type, args[i].type, (c, p) => this.isSubclass(c, p))) {
+      if (!this.accepts(params[i].type, args[i])) {
         this.report(
           "SEM007",
           "error",
